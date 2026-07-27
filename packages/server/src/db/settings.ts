@@ -4,7 +4,7 @@
  * Values are stored as text; this module owns the parsing so no route has to
  * remember that region_preference is JSON and strict_region is a string boolean.
  */
-import type { AppSettings } from '@vault-lookup/shared';
+import type { AppSettings } from '@vl-collection-builder/shared';
 import { getDb, nowIso } from './client.js';
 import { settingDefaults } from '../config.js';
 

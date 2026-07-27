@@ -1,4 +1,4 @@
-import { KNOWN_REGIONS } from '@vault-lookup/shared';
+import { KNOWN_REGIONS } from '@vl-collection-builder/shared';
 
 /**
  * Ordered region preference (plan §4.2). Order is the whole point — first place

@@ -28,7 +28,7 @@ import { mkdir, rename, stat, unlink } from 'node:fs/promises';
 import { dirname, join, resolve, sep } from 'node:path';
 import { pipeline } from 'node:stream/promises';
 import { Readable } from 'node:stream';
-import type { DownloadItem, DownloadProgress } from '@vault-lookup/shared';
+import type { DownloadItem, DownloadProgress } from '@vl-collection-builder/shared';
 import { config } from '../config.js';
 import { fetchPage } from '../catalog/fetcher.js';
 import { freeDiskMb } from '../util/disk.js';

@@ -11,7 +11,7 @@
  */
 import { copyFile, mkdir, readdir, rename, rm, stat, unlink, writeFile } from 'node:fs/promises';
 import { basename, extname, join, resolve, sep } from 'node:path';
-import type { Platform } from '@vault-lookup/shared';
+import type { Platform } from '@vl-collection-builder/shared';
 import { config, workPath } from '../config.js';
 import { loadRegistry } from '../sources/load.js';
 import { freeDiskMb } from '../util/disk.js';

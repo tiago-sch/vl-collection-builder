@@ -45,7 +45,7 @@ export function App() {
   return (
     <div className="app">
       <nav className="top">
-        <span className="brand">Vault Lookup</span>
+        <span className="brand">VL Collection Builder</span>
         <button className={tab === 'import' ? 'active' : ''} onClick={() => setTab('import')}>
           Import
         </button>

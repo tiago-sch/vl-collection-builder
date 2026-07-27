@@ -1,5 +1,5 @@
 import type { FastifyInstance } from 'fastify';
-import type { DownloadStatus } from '@vault-lookup/shared';
+import type { DownloadStatus } from '@vl-collection-builder/shared';
 import { config } from '../config.js';
 import { getDb } from '../db/client.js';
 import { freeDiskMb } from '../util/disk.js';

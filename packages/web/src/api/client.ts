@@ -14,7 +14,7 @@ import type {
   SetupState,
   SourceHealth,
   SyncProgress,
-} from '@vault-lookup/shared';
+} from '@vl-collection-builder/shared';
 
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
   const res = await fetch(`/api${path}`, {

@@ -1,4 +1,4 @@
-# Vault Lookup
+# VL Collection Builder
 
 Paste a list of game names, pick a platform, and get back the Vimm's Lair Vault
 page URL for each one. Ambiguous matches are confirmed by you in a
@@ -205,7 +205,7 @@ mirror of this table.
 | Variable | Default | Notes |
 |---|---|---|
 | `CRAWL_DELAY_MS` | `1200` | One request per this many ms, single concurrency. A full PS2 sync is ~75 requests — about 7 minutes, once a month. |
-| `USER_AGENT` | `vault-lookup/0.1 (personal catalogue tool)` | Honest and self-identifying. Used for all crawling. |
+| `USER_AGENT` | `vl-collection-builder/0.1 (personal catalogue tool)` | Honest and self-identifying. Used for all crawling. |
 | `REQUEST_TIMEOUT_MS` | `30000` | |
 | `CRAWL_MAX_RETRIES` | `3` | |
 | `CIRCUIT_FAILURE_THRESHOLD` | `5` | Consecutive failures before the source is skipped entirely, so a site that is down produces one clear error instead of hundreds of timeouts. |
@@ -318,9 +318,9 @@ boot. They add; they do not drop.
 Three things *will* lose data, and none of them are the upgrade itself:
 
 - **Renaming the stack.** Compose namespaces named volumes by project name, so
-  `vault-lookup` and `vaultlookup` produce
-  `vault-lookup_vaultlookup-data` and `vaultlookup_vaultlookup-data` — two
-  different volumes. Redeploying under a new stack name gives you an empty
+  a stack named `vl-collection-builder` and one named `vlcb` produce
+  `vl-collection-builder_vlcb-data` and `vlcb_vlcb-data` — two different
+  volumes. Redeploying under a new stack name gives you an empty
   database that looks exactly like data loss. Keep the stack name stable.
 - **`docker compose down -v`**, or ticking the volume-removal option when
   deleting a stack in Portainer. The `-v` is the whole difference.
@@ -338,7 +338,7 @@ docker compose pull && docker compose up -d
 Back up by exporting from the Library screen, or by copying the database out:
 
 ```bash
-docker cp vault-lookup:/data/vault.db ./vault-backup.db
+docker cp vl-collection-builder:/data/vault.db ./vault-backup.db
 ```
 
 ### NAS paths
@@ -351,12 +351,12 @@ host side, so the container never sees the rest of the share:
 
 ```yaml
 services:
-  vault-lookup:
-    image: vault-lookup:latest
-    container_name: vault-lookup
+  vl-collection-builder:
+    image: vl-collection-builder:latest
+    container_name: vl-collection-builder
     ports: ["127.0.0.1:8080:8080"]
     volumes:
-      - vaultlookup-data:/data                # named volume — LOCAL, see below
+      - vlcb-data:/data                # named volume — LOCAL, see below
       - /mnt/media/roms/.staging:/downloads    # NAS subfolder
       - /mnt/media/roms/library:/library       # NAS subfolder
     environment:
@@ -371,7 +371,7 @@ services:
     restart: unless-stopped
 
 volumes:
-  vaultlookup-data:
+  vlcb-data:
 ```
 
 Mounting `/mnt/media:/media` whole and setting `DOWNLOADS_PATH=/media/roms/.staging`
@@ -469,7 +469,7 @@ npm run eval      # measure match quality against your own confirmations
 
 ## Credits
 
-Built on prior work — see [§14 of the plan](vault-lookup-plan.md) and
+Built on prior work — see [§14 of the plan](vl-collection-builder-plan.md) and
 [THIRD_PARTY_LICENSES.md](THIRD_PARTY_LICENSES.md).
 
 - **[gamarr](https://github.com/JeremiahM37/gamarr)** (JeremiahM37) — the

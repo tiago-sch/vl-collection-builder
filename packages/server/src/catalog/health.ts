@@ -7,7 +7,7 @@
  * a retry window elapses — so a site that is down, or that has started refusing
  * us, produces one clear error instead of hundreds of timeouts.
  */
-import type { SourceHealth } from '@vault-lookup/shared';
+import type { SourceHealth } from '@vl-collection-builder/shared';
 import { getDb, nowIso } from '../db/client.js';
 import { config } from '../config.js';
 

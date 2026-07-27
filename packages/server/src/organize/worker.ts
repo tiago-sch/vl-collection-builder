@@ -5,7 +5,7 @@
  * does heavy I/O, so letting it run concurrently with a transfer would have them
  * competing for the same disk and link. One thing at a time, throughout.
  */
-import type { DownloadItem } from '@vault-lookup/shared';
+import type { DownloadItem } from '@vl-collection-builder/shared';
 import { config } from '../config.js';
 import { getDb } from '../db/client.js';
 import { recordFiles } from '../db/library.js';

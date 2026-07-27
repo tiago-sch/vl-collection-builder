@@ -12,7 +12,7 @@
 import { readFile } from 'node:fs/promises';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import type { CatalogEntry, LearnedAlias } from '@vault-lookup/shared';
+import type { CatalogEntry, LearnedAlias } from '@vl-collection-builder/shared';
 import { getDb, nowIso } from '../db/client.js';
 import { entriesByNorm, entryById } from '../db/catalog.js';
 import { normalizeTitle } from './normalize.js';

@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import type { Platform } from '@vault-lookup/shared';
+import type { Platform } from '@vl-collection-builder/shared';
 import { api, syncCatalog } from '../api/client.js';
 import { RegionPicker } from '../components/RegionPicker.js';
 
@@ -72,7 +72,7 @@ export function Setup({ onDone }: { onDone: () => void }) {
   return (
     <div className="app" style={{ maxWidth: 620 }}>
       <div style={{ padding: '32px 0 20px' }}>
-        <h1>Vault Lookup — first run</h1>
+        <h1>VL Collection Builder — first run</h1>
         <p className="sub">Three steps. Everything here can be changed later in Settings.</p>
       </div>
 
@@ -153,7 +153,7 @@ export function Setup({ onDone }: { onDone: () => void }) {
         <div className="panel">
           <h2>Step 3 of 3 — Optional AI assist</h2>
           <p className="muted">
-            Vault Lookup works fully without this. With an API key configured, titles that local
+            VL Collection Builder works fully without this. With an API key configured, titles that local
             matching cannot settle get one batched call before they reach your review queue. The
             model only ever proposes search strings or picks from candidates found locally — it
             never produces a URL or an ID.

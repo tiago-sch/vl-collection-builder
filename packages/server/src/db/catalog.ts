@@ -1,5 +1,5 @@
 /** Data access for the mirrored catalogue. */
-import type { CatalogEntry, CatalogSyncState, ParsedEntry, SyncStatus } from '@vault-lookup/shared';
+import type { CatalogEntry, CatalogSyncState, ParsedEntry, SyncStatus } from '@vl-collection-builder/shared';
 import { getDb, nowIso, transaction } from './client.js';
 import { normalizeTitle } from '../matching/normalize.js';
 

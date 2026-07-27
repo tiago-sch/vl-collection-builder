@@ -9,7 +9,7 @@ import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import type { ParsedEntry } from '@vault-lookup/shared';
+import type { ParsedEntry } from '@vl-collection-builder/shared';
 
 let dir: string;
 let db: typeof import('../src/db/client.js');
@@ -41,7 +41,7 @@ const entries: ParsedEntry[] = [
 ];
 
 beforeAll(async () => {
-  dir = mkdtempSync(join(tmpdir(), 'vault-lookup-test-'));
+  dir = mkdtempSync(join(tmpdir(), 'vl-collection-builder-test-'));
   process.env.DATABASE_PATH = join(dir, 'test.db');
   process.env.REGION_PREFERENCE = '';
 

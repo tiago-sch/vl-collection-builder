@@ -1,5 +1,5 @@
 {
-  "name": "@vault-lookup/web",
+  "name": "@vl-collection-builder/web",
   "version": "0.1.0",
   "private": true,
   "type": "module",
@@ -9,7 +9,7 @@
     "preview": "vite preview"
   },
   "dependencies": {
-    "@vault-lookup/shared": "*",
+    "@vl-collection-builder/shared": "*",
     "react": "^18.3.1",
     "react-dom": "^18.3.1"
   },

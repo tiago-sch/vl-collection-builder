@@ -55,7 +55,7 @@ export const config = {
 
   // --- crawler politeness ---
   crawlDelayMs: int('CRAWL_DELAY_MS', 1200),
-  userAgent: str('USER_AGENT', 'vault-lookup/0.1 (personal catalogue tool)'),
+  userAgent: str('USER_AGENT', 'vl-collection-builder/0.1 (personal catalogue tool)'),
   requestTimeoutMs: int('REQUEST_TIMEOUT_MS', 30_000),
   maxRetries: int('CRAWL_MAX_RETRIES', 3),
 

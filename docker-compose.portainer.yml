@@ -19,9 +19,9 @@
 # Keep the stack name stable, and do not tick "remove volumes" when updating.
 
 services:
-  vault-lookup:
+  vl-collection-builder:
     image: ghcr.io/tiago-sch/vl-collection-builder:latest
-    container_name: vault-lookup
+    container_name: vl-collection-builder
 
     # Loopback only. Put a reverse proxy in front for remote access; publishing
     # this straight onto a LAN gives anyone on it control of your downloads.
@@ -32,7 +32,7 @@ services:
       # SQLite — a LOCAL named volume, never a NAS path. SQLite's locking is
       # unreliable over NFS/CIFS and the failure mode is silent corruption, not
       # an error. It is only tens of MB. Back it up by exporting from the UI.
-      - vaultlookup-data:/data
+      - vlcb-data:/data
 
       # Staging (raw archives, disposable) and the organized library. Change
       # these two to your own paths; they resolve on the DOCKER HOST, not
@@ -74,4 +74,4 @@ services:
     restart: unless-stopped
 
 volumes:
-  vaultlookup-data:
+  vlcb-data:

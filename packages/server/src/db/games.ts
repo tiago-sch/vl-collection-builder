@@ -1,5 +1,5 @@
 /** Data access for the saved library — the deliverable. */
-import type { CatalogEntry, Game, MinimalGame, ResolvedTier } from '@vault-lookup/shared';
+import type { CatalogEntry, Game, MinimalGame, ResolvedTier } from '@vl-collection-builder/shared';
 import { getDb, nowIso } from './client.js';
 
 interface GameRow {

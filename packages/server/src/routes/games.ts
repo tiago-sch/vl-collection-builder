@@ -10,7 +10,7 @@ export async function gameRoutes(app: FastifyInstance): Promise<void> {
       if (req.query.format === 'csv') {
         return reply
           .header('content-type', 'text/csv; charset=utf-8')
-          .header('content-disposition', 'attachment; filename="vault-lookup.csv"')
+          .header('content-disposition', 'attachment; filename="vl-collection-builder.csv"')
           .send(toCsv(games));
       }
 

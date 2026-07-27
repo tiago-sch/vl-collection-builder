@@ -10,7 +10,7 @@
  * but can never promote a worse one. `effectiveRegionBonus` in db/settings.ts
  * clamps it, so even a bad Settings edit cannot violate this.
  */
-import type { CatalogEntry } from '@vault-lookup/shared';
+import type { CatalogEntry } from '@vl-collection-builder/shared';
 
 /** Case-insensitive index of a candidate's best region in the preference list. */
 export function regionRank(regions: string[], preference: string[]): number {

@@ -1,4 +1,4 @@
-# Vault Lookup — Project Plan
+# VL Collection Builder — Project Plan
 
 A self-hosted web app: paste a list of game names, pick a platform, and it resolves each title to its Vimm's Lair Vault page URL. Ambiguous matches are confirmed by you in the UI. Confirmed results are stored in a local SQLite database.
 
@@ -99,7 +99,7 @@ Single process, single port, no external services. The React app is built at ima
 ### Repository layout
 
 ```
-vault-lookup/
+vl-collection-builder/
 ├── docker-compose.yml
 ├── Dockerfile
 ├── package.json                  # npm workspaces
@@ -507,14 +507,14 @@ Multi-stage build:
 
 ```yaml
 services:
-  vault-lookup:
+  vl-collection-builder:
     build: .
     ports: ["8080:8080"]
     volumes: ["./data:/data"]
     environment:
       DATABASE_PATH: /data/vault.db
       CRAWL_DELAY_MS: "1200"
-      USER_AGENT: "vault-lookup/1.0 (personal catalogue tool)"
+      USER_AGENT: "vl-collection-builder/1.0 (personal catalogue tool)"
       SOURCES_PATH: ""        # optional: override the embedded source registry
       SOURCES_URL: ""         # optional: fetch registry from a URL
       REGION_PREFERENCE: ""   # pre-fills the first-run picker; empty → wizard asks
@@ -621,7 +621,7 @@ A **Downloads** screen joins the four existing ones: active item with a progress
 
 ```yaml
 services:
-  vault-lookup:
+  vl-collection-builder:
     build: .
     ports: ["8080:8080"]
     volumes:
@@ -816,7 +816,7 @@ Mechanics:
 
 ```yaml
 services:
-  vault-lookup:
+  vl-collection-builder:
     build: .
     ports: ["8080:8080"]
     volumes:
@@ -863,12 +863,12 @@ There are two ways to point them at subfolders of a NAS share, and the choice ma
 
 ```yaml
 services:
-  vault-lookup:
-    image: vault-lookup:latest
-    container_name: vault-lookup
+  vl-collection-builder:
+    image: vl-collection-builder:latest
+    container_name: vl-collection-builder
     ports: ["127.0.0.1:8080:8080"]
     volumes:
-      - vaultlookup-data:/data                    # named volume — LOCAL, see below
+      - vlcb-data:/data                    # named volume — LOCAL, see below
       - /mnt/media/roms/.staging:/downloads       # NAS subfolder
       - /mnt/media/roms/library:/library          # NAS subfolder
     environment:
@@ -882,7 +882,7 @@ services:
     restart: unless-stopped
 
 volumes:
-  vaultlookup-data:
+  vlcb-data:
 ```
 
 The alternative — mounting `/mnt/media:/media` whole and setting `DOWNLOADS_PATH=/media/roms/.staging` — also works and is fully supported. It's just strictly more exposure: a path bug then has your entire NAS in reach rather than one folder.

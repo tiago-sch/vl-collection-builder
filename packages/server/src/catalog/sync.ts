@@ -21,7 +21,7 @@
  * the feature plan §4.2 treats as policy. `listFilters` from the source registry
  * is therefore applied to every listing request.
  */
-import type { Platform, SyncProgress } from '@vault-lookup/shared';
+import type { Platform, SyncProgress } from '@vl-collection-builder/shared';
 import { fetchPage } from './fetcher.js';
 import { parseListing } from './parser.js';
 import { loadRegistry } from '../sources/load.js';

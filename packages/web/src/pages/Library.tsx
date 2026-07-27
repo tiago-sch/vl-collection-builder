@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { TIER_LABELS, type Game, type LibraryFile, type ResolvedTier } from '@vault-lookup/shared';
+import { TIER_LABELS, type Game, type LibraryFile, type ResolvedTier } from '@vl-collection-builder/shared';
 import { api } from '../api/client.js';
 
 export function Library() {

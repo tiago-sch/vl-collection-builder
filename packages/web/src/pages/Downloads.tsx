@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import type { DownloadItem, DownloadProgress, DownloadStatus } from '@vault-lookup/shared';
+import type { DownloadItem, DownloadProgress, DownloadStatus } from '@vl-collection-builder/shared';
 import { api, streamDownloads } from '../api/client.js';
 
 const ACTIVE_STATES: DownloadStatus[] = ['queued', 'active', 'paused', 'downloaded', 'organizing'];

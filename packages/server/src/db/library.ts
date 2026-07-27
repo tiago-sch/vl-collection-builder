@@ -1,5 +1,5 @@
 /** Data access for organized library files (plan §9.5). */
-import type { LibraryFile } from '@vault-lookup/shared';
+import type { LibraryFile } from '@vl-collection-builder/shared';
 import { getDb, nowIso } from './client.js';
 
 interface Row {

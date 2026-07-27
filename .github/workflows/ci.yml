@@ -95,12 +95,12 @@ jobs:
         # local daemon, so this rebuilds the native arch and actually runs it.
         if: github.event_name != 'pull_request'
         run: |
-          docker buildx build --load -t vault-lookup:smoke .
+          docker buildx build --load -t vl-collection-builder:smoke .
           docker run -d --name smoke -p 8080:8080 \
             -e REGION_PREFERENCE=USA,Europe \
             -e SETUP_SKIP=true \
             -e DOWNLOADS_ENABLED=false \
-            vault-lookup:smoke
+            vl-collection-builder:smoke
 
           for i in $(seq 1 60); do
             if curl -fsS http://127.0.0.1:8080/api/health > /dev/null; then break; fi

@@ -12,7 +12,7 @@ import {
   regionBonusFor,
   regionRank,
 } from '../src/matching/region.js';
-import type { CatalogEntry } from '@vault-lookup/shared';
+import type { CatalogEntry } from '@vl-collection-builder/shared';
 
 const score = (input: string, candidate: string): number =>
   scoreTitle(normalize(input), normalize(candidate));

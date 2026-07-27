@@ -71,7 +71,7 @@ a development machine, not inside the container.
 If the site's markup changes, re-capture with a polite single request:
 
 ```bash
-curl -sS --compressed -A "vault-lookup/0.1 (personal catalogue tool)" \
+curl -sS --compressed -A "vl-collection-builder/0.1 (personal catalogue tool)" \
   -o packages/server/test/fixtures/ps2-list-S.html \
   "https://vimm.net/vault/?p=list&system=PS2&section=S"
 ```

@@ -1,5 +1,5 @@
 import type { FastifyInstance } from 'fastify';
-import type { JobItemStatus } from '@vault-lookup/shared';
+import type { JobItemStatus } from '@vl-collection-builder/shared';
 import { resolvePlatform } from '../sources/load.js';
 import { countEntries } from '../db/catalog.js';
 import {

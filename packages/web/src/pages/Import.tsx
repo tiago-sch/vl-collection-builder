@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import type { CatalogSyncState, Platform } from '@vault-lookup/shared';
+import type { CatalogSyncState, Platform } from '@vl-collection-builder/shared';
 import { api, syncCatalog } from '../api/client.js';
 import { RegionPicker } from '../components/RegionPicker.js';
 

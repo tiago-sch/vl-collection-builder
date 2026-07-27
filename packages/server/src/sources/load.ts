@@ -9,7 +9,7 @@
 import { readFile } from 'node:fs/promises';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import type { Platform } from '@vault-lookup/shared';
+import type { Platform } from '@vl-collection-builder/shared';
 import { config } from '../config.js';
 
 export interface SourceRegistry {

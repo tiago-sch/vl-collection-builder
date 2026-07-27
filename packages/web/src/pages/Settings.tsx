@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import type { AppSettings, CatalogSyncState, LearnedAlias, SourceHealth } from '@vault-lookup/shared';
+import type { AppSettings, CatalogSyncState, LearnedAlias, SourceHealth } from '@vl-collection-builder/shared';
 import { api, syncCatalog } from '../api/client.js';
 import { RegionPicker } from '../components/RegionPicker.js';
 

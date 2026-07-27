@@ -1,5 +1,5 @@
 /** SQLite-backed download queue (plan §8.2). */
-import type { DownloadItem, DownloadStatus } from '@vault-lookup/shared';
+import type { DownloadItem, DownloadStatus } from '@vl-collection-builder/shared';
 import { getDb, nowIso, transaction } from '../db/client.js';
 
 interface DownloadRow {

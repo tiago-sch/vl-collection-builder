@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import type { Candidate, JobCounts, JobItem } from '@vault-lookup/shared';
+import type { Candidate, JobCounts, JobItem } from '@vl-collection-builder/shared';
 import { api } from '../api/client.js';
 
 /**

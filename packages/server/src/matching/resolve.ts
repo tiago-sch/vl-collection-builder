@@ -17,7 +17,7 @@ import type {
   CatalogEntry,
   JobItemStatus,
   ResolvedTier,
-} from '@vault-lookup/shared';
+} from '@vl-collection-builder/shared';
 import { normalize } from './normalize.js';
 import { scoreTitle } from './score.js';
 import {

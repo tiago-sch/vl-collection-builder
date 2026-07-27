@@ -8,7 +8,7 @@ import type {
   JobItem,
   JobItemStatus,
   ResolvedTier,
-} from '@vault-lookup/shared';
+} from '@vl-collection-builder/shared';
 import { getDb, nowIso, transaction } from '../db/client.js';
 import { allEntries, entryById } from '../db/catalog.js';
 import { addGame, ownedVaultIds } from '../db/games.js';

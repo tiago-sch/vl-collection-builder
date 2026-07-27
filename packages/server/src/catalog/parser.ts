@@ -28,7 +28,7 @@
  * and `display:none` is the semantic signal.
  */
 import * as cheerio from 'cheerio';
-import type { ParsedEntry, ParseResult } from '@vault-lookup/shared';
+import type { ParsedEntry, ParseResult } from '@vl-collection-builder/shared';
 
 /** The honeypot id. Never a real game. */
 export const DECOY_VAULT_ID = 999999;
