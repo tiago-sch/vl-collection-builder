@@ -282,4 +282,68 @@ export const KNOWN_REGIONS = [
   'World',
 ] as const;
 
+// ---------------------------------------------------------------------------
+// Downloads (plan §8)
+// ---------------------------------------------------------------------------
+
+export type DownloadStatus =
+  | 'queued'
+  | 'active'
+  | 'paused'
+  | 'completed'
+  | 'error'
+  | 'cancelled'
+  /** Bytes are on disk; the organizer has not run yet (plan §9.5). */
+  | 'downloaded'
+  | 'organizing'
+  | 'organized'
+  | 'organize_error';
+
+export interface DownloadItem {
+  id: number;
+  gameId: number | null;
+  vaultId: number;
+  vaultUrl: string;
+  title: string;
+  platform: string;
+  status: DownloadStatus;
+  position: number;
+  mediaId: number | null;
+  /** 1-based disc index for multi-disc releases. */
+  disc: number | null;
+  discTotal: number | null;
+  fileName: string | null;
+  destPath: string | null;
+  totalBytes: number;
+  receivedBytes: number;
+  attempts: number;
+  error: string | null;
+  queuedAt: string;
+  startedAt: string | null;
+  finishedAt: string | null;
+}
+
+/** SSE payload from /api/downloads/stream. */
+export interface DownloadProgress {
+  id: number;
+  status: DownloadStatus;
+  receivedBytes: number;
+  totalBytes: number;
+  /** Bytes per second over the last sample window. */
+  rate: number;
+  title: string;
+  fileName: string | null;
+}
+
+export interface LibraryFile {
+  id: number;
+  downloadId: number | null;
+  gameId: number | null;
+  platform: string;
+  relPath: string;
+  bytes: number | null;
+  kind: string | null;
+  createdAt: string;
+}
+
 export type ApiError = { error: string; detail?: string };

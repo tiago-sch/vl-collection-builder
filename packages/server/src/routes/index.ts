@@ -7,6 +7,7 @@ import { settingsRoutes } from './settings.js';
 import { jobRoutes } from './jobs.js';
 import { gameRoutes } from './games.js';
 import { aliasRoutes } from './aliases.js';
+import { downloadRoutes } from './downloads.js';
 
 export async function registerRoutes(app: FastifyInstance): Promise<void> {
   await app.register(
@@ -19,6 +20,7 @@ export async function registerRoutes(app: FastifyInstance): Promise<void> {
       await jobRoutes(api);
       await gameRoutes(api);
       await aliasRoutes(api);
+      await downloadRoutes(api);
     },
     { prefix: '/api' },
   );
