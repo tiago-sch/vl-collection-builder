@@ -1,5 +1,7 @@
 import type {
   AppSettings,
+  DownloadItem,
+  DownloadProgress,
   CatalogSyncState,
   Game,
   Job,
@@ -96,6 +98,52 @@ export const api = {
     request<{ aliases: LearnedAlias[] }>(`/aliases${platform ? `?platform=${platform}` : ''}`),
   deleteAlias: (id: number) => request<{ deleted: boolean }>(`/aliases/${id}`, { method: 'DELETE' }),
 
+  downloads: () =>
+    request<{
+      items: DownloadItem[];
+      active: DownloadItem | null;
+      stats: Record<string, number>;
+      downloading: boolean;
+      enabled: boolean;
+      freeDiskMb: number | null;
+      downloadsPath: string;
+      concurrency: number;
+      interDownloadDelayMs: number;
+    }>('/downloads'),
+
+  enqueueDownloads: (body: { gameIds?: number[]; vaultUrls?: string[] }) =>
+    request<{ queued: number[]; duplicates: number[]; errors: string[] }>('/downloads', {
+      method: 'POST',
+      body: JSON.stringify(body),
+    }),
+
+  reorderDownload: (id: number, position: number) =>
+    request<{ item: DownloadItem }>(`/downloads/${id}`, {
+      method: 'PATCH',
+      body: JSON.stringify({ position }),
+    }),
+
+  pauseDownload: (id: number) =>
+    request<{ item: DownloadItem }>(`/downloads/${id}`, {
+      method: 'PATCH',
+      body: JSON.stringify({ status: 'paused' }),
+    }),
+
+  resumeDownload: (id: number) =>
+    request<{ item: DownloadItem }>(`/downloads/${id}`, {
+      method: 'PATCH',
+      body: JSON.stringify({ status: 'queued' }),
+    }),
+
+  retryDownload: (id: number) =>
+    request<{ item: DownloadItem }>(`/downloads/${id}/retry`, { method: 'POST' }),
+
+  deleteDownload: (id: number, deletePart = false) =>
+    request<{ deleted?: boolean; cancelled?: boolean }>(
+      `/downloads/${id}${deletePart ? '?deletePart=true' : ''}`,
+      { method: 'DELETE' },
+    ),
+
   liveSearch: (platform: string, q: string) =>
     request<{ results: { vaultId: number; title: string; regions: string[]; url: string }[] }>(
       `/catalog/search/${platform}?q=${encodeURIComponent(q)}`,
@@ -153,4 +201,22 @@ export function syncCatalog(
   })();
 
   return () => controller.abort();
+}
+
+
+/** Download progress over SSE. Shares the transport with catalogue sync. */
+export function streamDownloads(handlers: {
+  onProgress?: (p: DownloadProgress) => void;
+  onError?: (message: string) => void;
+}): () => void {
+  const source = new EventSource('/api/downloads/stream');
+  source.addEventListener('progress', (e) => {
+    try {
+      handlers.onProgress?.(JSON.parse((e as MessageEvent).data));
+    } catch {
+      /* ignore a malformed frame rather than tearing down the stream */
+    }
+  });
+  source.onerror = () => handlers.onError?.('download progress stream disconnected');
+  return () => source.close();
 }

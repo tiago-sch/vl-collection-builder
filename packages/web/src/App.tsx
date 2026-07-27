@@ -4,9 +4,10 @@ import { Setup } from './pages/Setup.js';
 import { Import } from './pages/Import.js';
 import { Review } from './pages/Review.js';
 import { Library } from './pages/Library.js';
+import { Downloads } from './pages/Downloads.js';
 import { Settings } from './pages/Settings.js';
 
-type Tab = 'import' | 'review' | 'library' | 'settings';
+type Tab = 'import' | 'review' | 'library' | 'downloads' | 'settings';
 
 export function App() {
   const [ready, setReady] = useState(false);
@@ -59,6 +60,9 @@ export function App() {
         <button className={tab === 'library' ? 'active' : ''} onClick={() => setTab('library')}>
           Library
         </button>
+        <button className={tab === 'downloads' ? 'active' : ''} onClick={() => setTab('downloads')}>
+          Downloads
+        </button>
         <button className={tab === 'settings' ? 'active' : ''} onClick={() => setTab('settings')}>
           Settings
         </button>
@@ -78,6 +82,7 @@ export function App() {
         <Review jobId={jobId} onDone={() => setTab('import')} />
       )}
       {tab === 'library' && <Library />}
+      {tab === 'downloads' && <Downloads />}
       {tab === 'settings' && <Settings />}
     </div>
   );

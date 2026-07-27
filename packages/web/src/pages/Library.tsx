@@ -7,6 +7,8 @@ export function Library() {
   const [filter, setFilter] = useState('');
   const [platform, setPlatform] = useState('');
   const [error, setError] = useState<string | null>(null);
+  const [selected, setSelected] = useState<Set<number>>(new Set());
+  const [notice, setNotice] = useState<string | null>(null);
 
   const load = (): void => {
     void api
@@ -27,6 +29,29 @@ export function Library() {
         (!q || g.name.toLowerCase().includes(q) || (g.inputName ?? '').toLowerCase().includes(q)),
     );
   }, [games, filter, platform]);
+
+  const toggle = (id: number): void =>
+    setSelected((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+
+  // The queue is fed FROM the catalogue, which is the point of having built
+  // matching first: these are verified vault URLs, not guesses.
+  const enqueue = async (): Promise<void> => {
+    try {
+      const r = await api.enqueueDownloads({ gameIds: [...selected] });
+      const parts = [`${r.queued.length} queued`];
+      if (r.duplicates.length) parts.push(`${r.duplicates.length} already in the queue`);
+      if (r.errors.length) parts.push(r.errors.join('; '));
+      setNotice(parts.join(' · '));
+      setSelected(new Set());
+    } catch (err) {
+      setError((err as Error).message);
+    }
+  };
 
   const remove = async (id: number): Promise<void> => {
     try {
@@ -50,6 +75,7 @@ export function Library() {
       <p className="sub">{games.length} saved game{games.length === 1 ? '' : 's'}.</p>
 
       {error && <div className="banner error">{error}</div>}
+      {notice && <div className="banner info">{notice}</div>}
 
       <div className="panel">
         <div className="row">
@@ -72,6 +98,13 @@ export function Library() {
               </option>
             ))}
           </select>
+          <button
+            className="primary"
+            disabled={selected.size === 0}
+            onClick={() => void enqueue()}
+          >
+            Add {selected.size || ''} to downloads
+          </button>
           <a className="btn" href={exportUrl('minimal')} target="_blank" rel="noreferrer">
             Export JSON
           </a>
@@ -85,6 +118,17 @@ export function Library() {
         <table>
           <thead>
             <tr>
+              <th style={{ width: 30 }}>
+                <input
+                  type="checkbox"
+                  aria-label="Select all"
+                  checked={shown.length > 0 && shown.every((g) => selected.has(g.id))}
+                  onChange={(e) =>
+                    setSelected(e.target.checked ? new Set(shown.map((g) => g.id)) : new Set())
+                  }
+                  style={{ width: 'auto' }}
+                />
+              </th>
               <th>Name</th>
               <th style={{ width: 90 }}>Platform</th>
               <th style={{ width: 90 }}>Region</th>
@@ -97,6 +141,15 @@ export function Library() {
           <tbody>
             {shown.map((g) => (
               <tr key={g.id}>
+                <td>
+                  <input
+                    type="checkbox"
+                    aria-label={`Select ${g.name}`}
+                    checked={selected.has(g.id)}
+                    onChange={() => toggle(g.id)}
+                    style={{ width: 'auto' }}
+                  />
+                </td>
                 <td>
                   {g.name}
                   {g.inputName && g.inputName !== g.name && (
@@ -131,7 +184,7 @@ export function Library() {
             ))}
             {shown.length === 0 && (
               <tr>
-                <td colSpan={7} className="muted" style={{ padding: 20, textAlign: 'center' }}>
+                <td colSpan={8} className="muted" style={{ padding: 20, textAlign: 'center' }}>
                   {games.length === 0
                     ? 'Nothing saved yet — run an import.'
                     : 'No games match that filter.'}
