@@ -23,10 +23,17 @@ services:
     image: ghcr.io/tiago-sch/vl-collection-builder:latest
     container_name: vl-collection-builder
 
-    # Loopback only. Put a reverse proxy in front for remote access; publishing
-    # this straight onto a LAN gives anyone on it control of your downloads.
+    # Reachable from your LAN, which is what you want on a NAS — binding to
+    # 127.0.0.1 would make the UI unreachable from any other machine, including
+    # the one you are reading this on.
+    #
+    # There is no login: anyone who can reach this port can queue downloads and
+    # edit your library. That is usually fine on a home LAN. If it is not, bind
+    # to loopback and put a reverse proxy with auth in front:
+    #     - "127.0.0.1:8080:8080"
+    # Do NOT port-forward this from your router.
     ports:
-      - "127.0.0.1:8080:8080"
+      - "8080:8080"
 
     volumes:
       # SQLite — a LOCAL named volume, never a NAS path. SQLite's locking is

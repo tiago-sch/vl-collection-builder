@@ -58,8 +58,15 @@ COPY --from=build /app/packages/server/dist      ./packages/server/dist
 COPY --from=build /app/packages/server/package.json ./packages/server/package.json
 COPY --from=build /app/packages/web/dist         ./packages/web/dist
 
+# Owned by `node` (uid 1000) for the default case, but also group- and
+# world-writable so the image still works when the operator sets `user:` to
+# match a NAS share with a different uid. A named volume inherits these
+# permissions on creation, and without them /data is unwritable for any uid
+# other than 1000 — which surfaces as an opaque SQLite error at boot.
+# Host permissions still govern anything bind-mounted over these paths.
 RUN mkdir -p /data /downloads /library \
- && chown -R node:node /data /downloads /library /app
+ && chown -R node:node /data /downloads /library /app \
+ && chmod 0777 /data /downloads /library
 USER node
 
 VOLUME ["/data", "/downloads", "/library"]

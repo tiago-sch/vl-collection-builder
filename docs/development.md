@@ -165,8 +165,19 @@ emits nothing and the image ships without `dist`.
 
 ## Container user
 
-The image runs as uid/gid 1000 (`node`). There is no `PUID`/`PGID` entrypoint —
-that convention needs a root entrypoint that drops privileges, and advertising
-the variables without implementing them would fail silently on the first write.
-Use Docker's `user:` directive to run as a different uid.
+The image runs as uid/gid 1000 (`node`) by default. There is no `PUID`/`PGID`
+entrypoint — that convention needs a root entrypoint that drops privileges, and
+advertising the variables without implementing them would fail silently on the
+first write. Use Docker's `user:` directive to run as a different uid.
+
+The mount points are created `0777` in the image specifically so that works. A
+named volume inherits its permissions from the image at creation, so without it
+`/data` is unwritable by any uid other than 1000 — and the symptom is an opaque
+`unable to open database file` rather than anything about permissions. Host
+permissions still govern anything bind-mounted over those paths.
+
+For the same reason the startup preflight runs **before** the database is
+opened. Opening the database is the first thing that fails on an unwritable
+path, so a preflight that ran after it would never get the chance to explain
+what was actually wrong.
 

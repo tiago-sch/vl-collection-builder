@@ -21,16 +21,9 @@ async function main(): Promise<void> {
     bodyLimit: 4 * 1024 * 1024, // a pasted list of a few thousand names
   });
 
-  const { migrationsRun, path } = await initDb((m) => app.log.info(m));
-  app.log.info(`database ready at ${path}`);
-  if (migrationsRun.length) app.log.info(`applied migrations: ${migrationsRun.join(', ')}`);
-
-  const { registry, warnings } = await loadRegistry();
-  for (const w of warnings) app.log.warn(w);
-  app.log.info(`source registry loaded: ${registry.platforms.length} platforms, base ${registry.baseUrl}`);
-
-  // Verify paths before anything writes to them. Failing here with a clear
-  // message beats failing after a 4 GB download (plan §9.6b).
+  // Before touching the database. Opening it is the FIRST thing that fails when
+  // a path is not writable, and it fails with a bare `unable to open database
+  // file` — which is exactly the message the preflight exists to replace.
   const checks = await preflight();
   for (const i of checks.info) app.log.info(i);
   for (const w of checks.warnings) app.log.warn(w);
@@ -39,6 +32,14 @@ async function main(): Promise<void> {
     app.log.error('startup preflight failed — fix the paths above and restart');
     process.exit(1);
   }
+
+  const { migrationsRun, path } = await initDb((m) => app.log.info(m));
+  app.log.info(`database ready at ${path}`);
+  if (migrationsRun.length) app.log.info(`applied migrations: ${migrationsRun.join(', ')}`);
+
+  const { registry, warnings } = await loadRegistry();
+  for (const w of warnings) app.log.warn(w);
+  app.log.info(`source registry loaded: ${registry.platforms.length} platforms, base ${registry.baseUrl}`);
 
   await registerRoutes(app);
 

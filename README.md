@@ -278,9 +278,24 @@ ghcr.io/tiago-sch/vl-collection-builder:latest
 Built for `linux/amd64` and `linux/arm64`, so it runs on a normal server and on a
 Synology or Raspberry Pi alike.
 
-Paste [`docker-compose.portainer.yml`](docker-compose.portainer.yml) into
-Portainer as a Stack (**Stacks → Add stack → Web editor**) and adjust the two NAS
-paths and the `user:` line.
+**Installing:**
+
+1. **Stacks → Add stack → Web editor**, name it something you will not change
+   later (see the upgrade notes — renaming the stack orphans your database).
+2. Paste [`docker-compose.portainer.yml`](docker-compose.portainer.yml).
+3. Change the two NAS paths to your own, and set `user:` to the owner of that
+   share — `id -u` and `id -g` on the host. If you are unsure, leave `1000:1000`.
+4. **Deploy the stack**, then open `http://<your-nas>:8080` and follow the
+   first-run wizard.
+
+**Updating** — when a new image has been published:
+
+**Stacks → your stack → Update the stack**, with **Re-pull image** ticked. Your
+data lives in the volumes, not the image; see [Upgrading](#upgrading) for the
+three things that *would* lose it.
+
+To check what you are running: the container logs print the applied migrations at
+boot, and Settings shows the catalogue state.
 
 > **Before the first deploy:** a newly created GHCR package is **private**, and
 > the pull will fail with `denied`. Either make it public once, under
