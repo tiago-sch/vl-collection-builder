@@ -1,9 +1,19 @@
 import { useEffect, useState } from 'react';
-import type { AppSettings, CatalogSyncState, LearnedAlias, SourceHealth } from '@vl-collection-builder/shared';
+import type {
+  AppSettings,
+  CatalogSyncState,
+  LearnedAlias,
+  SourceHealth,
+  SyncProgress,
+} from '@vl-collection-builder/shared';
 import { api, syncCatalog } from '../api/client.js';
 import { RegionPicker } from '../components/RegionPicker.js';
 
-type CatalogRow = CatalogSyncState & { label: string; syncing: boolean };
+type CatalogRow = CatalogSyncState & {
+  label: string;
+  syncing: boolean;
+  progress: SyncProgress | null;
+};
 
 export function Settings() {
   const [settings, setSettings] = useState<AppSettings | null>(null);

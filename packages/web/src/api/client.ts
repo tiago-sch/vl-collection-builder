@@ -49,7 +49,12 @@ export const api = {
 
   catalogStatus: () =>
     request<{
-      platforms: (CatalogSyncState & { label: string; syncing: boolean })[];
+      platforms: (CatalogSyncState & {
+        label: string;
+        syncing: boolean;
+        /** Present while a crawl is running, so a reload shows it immediately. */
+        progress: SyncProgress | null;
+      })[];
       health: SourceHealth;
       staleAfterDays: number;
     }>('/catalog/status'),
@@ -173,6 +178,9 @@ export const api = {
   reorganize: (id: number) =>
     request<{ queued: boolean }>(`/downloads/${id}/reorganize`, { method: 'POST' }),
 
+  cancelSync: (platform: string) =>
+    request<{ cancelled: boolean }>(`/catalog/sync/${platform}/cancel`, { method: 'POST' }),
+
   liveSearch: (platform: string, q: string) =>
     request<{ results: { vaultId: number; title: string; regions: string[]; url: string }[] }>(
       `/catalog/search/${platform}?q=${encodeURIComponent(q)}`,
@@ -180,14 +188,19 @@ export const api = {
 };
 
 /**
- * Catalogue sync over SSE. The crawl takes minutes, so progress has to stream
- * rather than resolve at the end.
+ * Watch a catalogue sync.
+ *
+ * `start: true` begins one if it is not already running; otherwise this only
+ * attaches. Either way, closing the stream just detaches this watcher — the
+ * crawl is a background job on the server and keeps running through a refresh,
+ * a tab change, or the browser being closed entirely.
  */
-export function syncCatalog(
+export function watchCatalogSync(
   platform: string,
   handlers: {
+    start?: boolean;
     onProgress?: (p: SyncProgress) => void;
-    onDone?: (r: { entryCount: number; pagesFetched: number; warnings: string[] }) => void;
+    onDone?: (r: { entryCount: number; pagesFetched: number; warnings: string[] } | null) => void;
     onError?: (message: string) => void;
   },
 ): () => void {
@@ -195,11 +208,10 @@ export function syncCatalog(
 
   void (async () => {
     try {
-      const res = await fetch(`/api/catalog/sync/${platform}`, {
-        method: 'POST',
-        signal: controller.signal,
-      });
-      if (!res.ok || !res.body) throw new Error(`sync failed: ${res.status}`);
+      const res = handlers.start
+        ? await fetch(`/api/catalog/sync/${platform}`, { method: 'POST', signal: controller.signal })
+        : await fetch(`/api/catalog/sync/${platform}/stream`, { signal: controller.signal });
+      if (!res.ok || !res.body) throw new Error(`sync stream failed: ${res.status}`);
 
       const reader = res.body.getReader();
       const decoder = new TextDecoder();
@@ -210,7 +222,6 @@ export function syncCatalog(
         if (done) break;
         buffer += decoder.decode(value, { stream: true });
 
-        // SSE frames are separated by a blank line.
         const frames = buffer.split('\n\n');
         buffer = frames.pop() ?? '';
 
@@ -222,6 +233,7 @@ export function syncCatalog(
           if (event === 'progress') handlers.onProgress?.(payload);
           else if (event === 'done') handlers.onDone?.(payload);
           else if (event === 'error') handlers.onError?.(payload.error);
+          else if (event === 'idle') handlers.onDone?.(null);
         }
       }
     } catch (err) {
@@ -230,6 +242,18 @@ export function syncCatalog(
   })();
 
   return () => controller.abort();
+}
+
+/** Backwards-compatible alias: starts a sync and watches it. */
+export function syncCatalog(
+  platform: string,
+  handlers: {
+    onProgress?: (p: SyncProgress) => void;
+    onDone?: (r: { entryCount: number; pagesFetched: number; warnings: string[] } | null) => void;
+    onError?: (message: string) => void;
+  },
+): () => void {
+  return watchCatalogSync(platform, { ...handlers, start: true });
 }
 
 

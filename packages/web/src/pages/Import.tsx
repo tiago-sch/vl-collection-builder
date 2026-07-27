@@ -1,9 +1,13 @@
 import { useEffect, useMemo, useState } from 'react';
-import type { CatalogSyncState, Platform } from '@vl-collection-builder/shared';
-import { api, syncCatalog } from '../api/client.js';
+import type { CatalogSyncState, Platform, SyncProgress } from '@vl-collection-builder/shared';
+import { api, watchCatalogSync } from '../api/client.js';
 import { RegionPicker } from '../components/RegionPicker.js';
 
-type CatalogRow = CatalogSyncState & { label: string; syncing: boolean };
+type CatalogRow = CatalogSyncState & {
+  label: string;
+  syncing: boolean;
+  progress: SyncProgress | null;
+};
 
 export function Import({ onJobCreated }: { onJobCreated: (jobId: number) => void }) {
   const [platforms, setPlatforms] = useState<Platform[]>([]);
@@ -59,14 +63,15 @@ export function Import({ onJobCreated }: { onJobCreated: (jobId: number) => void
     }
   };
 
-  const runSync = (): void => {
+  const attach = (start: boolean): (() => void) => {
     setSyncProgress('starting…');
-    syncCatalog(platform, {
+    return watchCatalogSync(platform, {
+      start,
       onProgress: (p) => setSyncProgress(`${p.section} — ${p.entriesSeen.toLocaleString()} games`),
       onDone: (r) => {
         setSyncProgress(null);
         refresh();
-        if (r.warnings.length) setError(r.warnings.join(' · '));
+        if (r?.warnings.length) setError(r.warnings.join(' · '));
       },
       onError: (m) => {
         setSyncProgress(null);
@@ -74,6 +79,23 @@ export function Import({ onJobCreated }: { onJobCreated: (jobId: number) => void
       },
     });
   };
+
+  const runSync = (): void => {
+    attach(true);
+  };
+
+  // A sync is a background job on the server, so one may already be running —
+  // started from another tab, or before this page was reloaded. Reattach to it
+  // rather than showing nothing.
+  useEffect(() => {
+    const row = catalog.find((c) => c.platform === platform);
+    if (!row?.syncing) return;
+    setSyncProgress(
+      row.progress ? `${row.progress.section} — ${row.progress.entriesSeen.toLocaleString()} games` : 'in progress…',
+    );
+    return attach(false);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [platform, catalog]);
 
   return (
     <>

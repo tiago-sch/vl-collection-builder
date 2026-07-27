@@ -1,8 +1,9 @@
-import type { FastifyInstance } from 'fastify';
+import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
 import { loadRegistry, resolvePlatform } from '../sources/load.js';
 import { getSyncState } from '../db/catalog.js';
 import { getSettings } from '../db/settings.js';
-import { isSyncing, liveSearch, syncPlatform } from '../catalog/sync.js';
+import { liveSearch } from '../catalog/sync.js';
+import { cancelSync, getRun, isSyncing, startSync, subscribe } from '../catalog/manager.js';
 import { getHealth, resetHealth } from '../catalog/health.js';
 import { SOURCE_NAME } from '../catalog/fetcher.js';
 
@@ -11,52 +12,48 @@ export async function catalogRoutes(app: FastifyInstance): Promise<void> {
     const { registry } = await loadRegistry();
     const { staleAfterDays } = getSettings();
     return {
-      platforms: registry.platforms.map((p) => ({
-        ...getSyncState(p.slug, staleAfterDays),
-        label: p.label,
-        syncing: isSyncing(p.slug),
-      })),
+      platforms: registry.platforms.map((p) => {
+        const run = getRun(p.slug);
+        return {
+          ...getSyncState(p.slug, staleAfterDays),
+          label: p.label,
+          syncing: isSyncing(p.slug),
+          // Live progress travels with the status, so a page loaded mid-crawl
+          // shows where things stand before any stream connects.
+          progress: run && run.finishedAt === null ? run.progress : null,
+        };
+      }),
       health: getHealth(SOURCE_NAME),
       staleAfterDays,
     };
   });
 
   /**
-   * Streams progress as SSE. The crawl is slow by design (one request per
-   * CRAWL_DELAY_MS), so a plain request/response would just time out.
+   * Start a sync (or attach to one already running) and stream its progress.
+   *
+   * Disconnecting only detaches this watcher — the crawl keeps going. That is
+   * the point: a refresh or a tab change used to abort a multi-minute crawl
+   * partway through, because the job was owned by the request.
    */
   app.post<{ Params: { platform: string } }>('/catalog/sync/:platform', async (req, reply) => {
     const platform = await resolvePlatform(req.params.platform);
     if (!platform) return reply.code(404).send({ error: 'unknown_platform' });
-    if (isSyncing(platform.slug)) return reply.code(409).send({ error: 'sync_already_running' });
 
-    reply.raw.writeHead(200, {
-      'content-type': 'text/event-stream',
-      'cache-control': 'no-cache',
-      connection: 'keep-alive',
-      'x-accel-buffering': 'no',
-    });
+    startSync(platform);
+    return await streamRun(platform.slug, req, reply);
+  });
 
-    const send = (event: string, data: unknown): void => {
-      reply.raw.write(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`);
-    };
+  /** Attach to a running sync without starting one — used after a reload. */
+  app.get<{ Params: { platform: string } }>('/catalog/sync/:platform/stream', async (req, reply) => {
+    const platform = await resolvePlatform(req.params.platform);
+    if (!platform) return reply.code(404).send({ error: 'unknown_platform' });
+    return await streamRun(platform.slug, req, reply);
+  });
 
-    // Stop the crawl if the client goes away mid-sync.
-    const controller = new AbortController();
-    req.raw.on('close', () => controller.abort());
-
-    try {
-      const result = await syncPlatform(platform, {
-        signal: controller.signal,
-        onProgress: (p) => send('progress', p),
-      });
-      send('done', result);
-    } catch (err) {
-      send('error', { error: (err as Error).message });
-    } finally {
-      reply.raw.end();
-    }
-    return reply;
+  app.post<{ Params: { platform: string } }>('/catalog/sync/:platform/cancel', async (req, reply) => {
+    const platform = await resolvePlatform(req.params.platform);
+    if (!platform) return reply.code(404).send({ error: 'unknown_platform' });
+    return { cancelled: cancelSync(platform.slug) };
   });
 
   /** Non-streaming variant, for scripts and curl. */
@@ -64,6 +61,7 @@ export async function catalogRoutes(app: FastifyInstance): Promise<void> {
     const platform = await resolvePlatform(req.params.platform);
     if (!platform) return reply.code(404).send({ error: 'unknown_platform' });
     if (isSyncing(platform.slug)) return reply.code(409).send({ error: 'sync_already_running' });
+    const { syncPlatform } = await import('../catalog/sync.js');
     try {
       return await syncPlatform(platform);
     } catch (err) {
@@ -96,6 +94,59 @@ export async function catalogRoutes(app: FastifyInstance): Promise<void> {
       }
     },
   );
+
+  /** Shared SSE plumbing for both the start and attach routes. */
+  async function streamRun(
+    slug: string,
+    req: FastifyRequest,
+    reply: FastifyReply,
+  ): Promise<FastifyReply> {
+    reply.raw.writeHead(200, {
+      'content-type': 'text/event-stream',
+      'cache-control': 'no-cache',
+      connection: 'keep-alive',
+      'x-accel-buffering': 'no',
+    });
+
+    const send = (event: string, data: unknown): void => {
+      reply.raw.write(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`);
+    };
+
+    const run = getRun(slug);
+    if (!run) {
+      send('idle', { platform: slug });
+      reply.raw.end();
+      return reply;
+    }
+
+    // Replay current state immediately, so a reconnecting client is not left
+    // staring at nothing until the next section boundary — which can be a
+    // minute away.
+    send('progress', run.progress);
+    if (run.finishedAt) {
+      send(run.error ? 'error' : 'done', run.error ? { error: run.error } : run.result);
+      reply.raw.end();
+      return reply;
+    }
+
+    const off = subscribe(slug, (p) => {
+      send('progress', p);
+      if (p.status !== 'running') {
+        const finished = getRun(slug);
+        send(p.status === 'error' ? 'error' : 'done', finished?.error ? { error: finished.error } : finished?.result);
+      }
+    });
+    const ping = setInterval(() => reply.raw.write(': ping\n\n'), 20_000);
+
+    req.raw.on('close', () => {
+      // Detach only. The crawl is not ours to cancel.
+      off();
+      clearInterval(ping);
+      reply.raw.end();
+    });
+
+    return reply;
+  }
 
   app.post('/catalog/health/reset', async () => {
     resetHealth(SOURCE_NAME);

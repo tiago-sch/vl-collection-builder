@@ -188,7 +188,10 @@ export function getSyncState(platform: string, staleAfterDays: number): CatalogS
   return {
     platform,
     lastSyncedAt,
-    entryCount: row?.entry_count ?? countEntries(platform),
+    // Counted live rather than read from the cache, which is only written on a
+    // successful completion. A cancelled or failed sync still persists every
+    // page it did fetch, and reporting 0 for ~800 real rows is just wrong.
+    entryCount: countEntries(platform),
     status: row?.status ?? 'idle',
     error: row?.error ?? null,
     ageDays,

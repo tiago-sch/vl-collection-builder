@@ -50,7 +50,7 @@ export function Setup({ onDone }: { onDone: () => void }) {
         setProgress({ done: p.sectionsDone, total: p.sectionsTotal, seen: p.entriesSeen }),
       onDone: (r) => {
         setSyncing(false);
-        setSyncDone(`${r.entryCount.toLocaleString()} games mirrored in ${r.pagesFetched} requests`);
+        if (r) setSyncDone(`${r.entryCount.toLocaleString()} games mirrored in ${r.pagesFetched} requests`);
       },
       onError: (m) => {
         setSyncing(false);

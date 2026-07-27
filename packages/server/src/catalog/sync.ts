@@ -83,12 +83,11 @@ function listingUrl(
   return `${baseUrl}/vault/?${params.toString()}`;
 }
 
-/** Tracks in-flight syncs so two clients cannot crawl the same platform at once. */
+/**
+ * Guards against two crawls of the same platform overlapping. The manager also
+ * de-duplicates at a higher level; this is the backstop.
+ */
 const running = new Set<string>();
-
-export function isSyncing(platform: string): boolean {
-  return running.has(platform);
-}
 
 export async function syncPlatform(
   platform: Platform,
@@ -118,6 +117,10 @@ export async function syncPlatform(
 
       let page = 1;
       for (;;) {
+        // Checked per page, not just per section: a section can be several
+        // pages and a cancel that takes ten seconds to land feels broken.
+        if (opts.signal?.aborted) throw new Error('sync cancelled');
+
         const url = listingUrl(
           registry.baseUrl,
           platform.system,
