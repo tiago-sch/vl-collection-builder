@@ -45,6 +45,7 @@ function toItem(r: DownloadRow): DownloadItem {
     destPath: r.dest_path,
     totalBytes: r.total_bytes,
     receivedBytes: r.received_bytes,
+    expectCrc32: r.expect_crc32,
     attempts: r.attempts,
     error: r.error,
     queuedAt: r.queued_at,

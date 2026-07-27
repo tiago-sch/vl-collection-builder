@@ -74,11 +74,9 @@ export async function libraryRoutes(app: FastifyInstance): Promise<void> {
 
   /** Re-organize without re-downloading — the payoff of KEEP_ARCHIVE (plan §9.5). */
   app.post<{ Params: { id: string } }>('/downloads/:id/reorganize', async (req, reply) => {
-    if (!requeueForOrganize(Number(req.params.id))) {
-      return reply.code(409).send({
-        error: 'cannot_reorganize',
-        detail: 'no downloaded file is recorded for this item',
-      });
+    const result = requeueForOrganize(Number(req.params.id));
+    if (!result.ok) {
+      return reply.code(409).send({ error: 'cannot_reorganize', detail: result.reason });
     }
     return { queued: true };
   });

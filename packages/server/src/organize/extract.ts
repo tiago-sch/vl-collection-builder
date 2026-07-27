@@ -47,6 +47,54 @@ export function isSafeEntryPath(destRoot: string, entryPath: string): boolean {
   return full === root || full.startsWith(root + sep);
 }
 
+/** One entry's metadata, read from the zip index without decompressing. */
+export interface ZipEntryInfo {
+  fileName: string;
+  /** Stored CRC32, lower-case hex — comparable to Vimm's published GoodHash. */
+  crc32: string;
+  uncompressedSize: number;
+}
+
+/**
+ * Read the zip index.
+ *
+ * The central directory carries each entry's CRC32, so the archive's contents
+ * can be identified against a published checksum without decompressing a single
+ * byte — which matters when the payload is a 4 GB disc image.
+ */
+export function zipEntries(zipPath: string): Promise<ZipEntryInfo[]> {
+  return new Promise((res, rej) => {
+    const out: ZipEntryInfo[] = [];
+    yauzl.open(zipPath, { lazyEntries: true, autoClose: true }, (err, zip) => {
+      if (err || !zip) return rej(err ?? new Error('could not open archive'));
+      zip.on('entry', (entry: yauzl.Entry) => {
+        if (!entry.fileName.endsWith('/')) {
+          out.push({
+            fileName: entry.fileName,
+            crc32: (entry.crc32 >>> 0).toString(16).padStart(8, '0'),
+            uncompressedSize: entry.uncompressedSize,
+          });
+        }
+        zip.readEntry();
+      });
+      zip.on('end', () => res(out));
+      zip.on('error', rej);
+      zip.readEntry();
+    });
+  });
+}
+
+/**
+ * Files Vimm bundles alongside the ROM that are not game content.
+ *
+ * Every archive ships a `Vimm's Lair.txt`. Treating it as content would rename
+ * it after the game, push every single-ROM download into a per-game subfolder
+ * because the archive now looks multi-file, and record it in the library.
+ */
+export function isAuxiliaryFile(fileName: string): boolean {
+  return /\.(txt|nfo|diz|url|sfv|md5|sha1|htm|html)$/i.test(fileName);
+}
+
 /** List entry names without extracting, so an archive can be vetted first. */
 export function listZipEntries(zipPath: string): Promise<string[]> {
   return new Promise((res, rej) => {

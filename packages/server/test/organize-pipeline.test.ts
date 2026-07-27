@@ -6,6 +6,7 @@
  * with its cue still pointing at files that exist.
  */
 import { execFileSync } from 'node:child_process';
+import { createHash } from 'node:crypto';
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
@@ -150,5 +151,81 @@ describe('cartridge systems', () => {
 describe('staging', () => {
   it('keeps the archive when KEEP_ARCHIVE is set, so re-organizing is free', () => {
     expect(existsSync(join(dir, 'dl', 'okami.zip'))).toBe(true);
+  });
+});
+
+describe('the bundled readme', () => {
+  it('is dropped, so a single-ROM game stays flat and unrenamed', async () => {
+    // Every Vimm archive contains a `Vimm's Lair.txt`. Before this was handled,
+    // it was renamed to "<game>.txt" and, because the archive then looked
+    // multi-file, the game was given its own subfolder for no reason.
+    const zip = makeZip('smw', {
+      'Super Mario World (USA).sfc': 'ROMDATA',
+      "Vimm's Lair.txt": 'come visit us',
+    });
+
+    const result = await organize({
+      downloadId: 10,
+      gameId: null,
+      platform: SNES,
+      archivePath: zip,
+      title: 'Super Mario World',
+      region: 'USA',
+      version: '1.0',
+      vaultId: 7960,
+      disc: null,
+    });
+
+    expect(result.files).toHaveLength(1);
+    expect(result.files[0]!.relPath).toBe('snes/Super Mario World (USA).zip');
+    expect(result.files.some((f) => f.relPath.endsWith('.txt'))).toBe(false);
+  });
+});
+
+describe('ROM verification', () => {
+  const ROM = 'MARIOROMBYTES';
+  const sha1 = createHash('sha1').update(ROM).digest('hex');
+
+  it('accepts an extracted ROM matching the published sha1', async () => {
+    // The published checksum describes the ROM, NOT the downloaded archive —
+    // hashing the .zip against it fails every time, which is what made every
+    // download error out.
+    const zip = makeZip('verify-ok', {
+      'game.sfc': ROM,
+      "Vimm's Lair.txt": 'advert',
+    });
+
+    const result = await organize({
+      downloadId: 11,
+      gameId: null,
+      expectSha1: sha1,
+      platform: { ...SNES, discBased: true }, // force extraction
+      archivePath: zip,
+      title: 'Verified Game',
+      region: 'USA',
+      version: '1.0',
+      vaultId: 1,
+      disc: null,
+    });
+    expect(result.files).toHaveLength(1);
+    expect(result.files[0]!.relPath).toBe('snes/Verified Game (USA).sfc');
+  });
+
+  it('rejects a ROM whose sha1 does not match', async () => {
+    const zip = makeZip('verify-bad', { 'game.sfc': 'CORRUPTED' });
+    await expect(
+      organize({
+        downloadId: 12,
+        gameId: null,
+        expectSha1: sha1,
+        platform: { ...SNES, discBased: true },
+        archivePath: zip,
+        title: 'Corrupt Game',
+        region: 'USA',
+        version: '1.0',
+        vaultId: 2,
+        disc: null,
+      }),
+    ).rejects.toThrow(/sha1 mismatch on the extracted ROM/);
   });
 });

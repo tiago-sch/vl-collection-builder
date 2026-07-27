@@ -312,6 +312,8 @@ export interface DownloadItem {
   destPath: string | null;
   totalBytes: number;
   receivedBytes: number;
+  /** CRC32 of the ROM inside the archive, as published on the vault page. */
+  expectCrc32: string | null;
   attempts: number;
   error: string | null;
   queuedAt: string;

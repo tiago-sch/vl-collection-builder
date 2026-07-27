@@ -22,8 +22,7 @@
  * The serial design is also *why* the rest of this is simple: no lock
  * contention, no partial-file races, no competing writes to the same `.part`.
  */
-import { createHash } from 'node:crypto';
-import { createReadStream, createWriteStream } from 'node:fs';
+import { createWriteStream } from 'node:fs';
 import { mkdir, rename, stat, unlink } from 'node:fs/promises';
 import { dirname, join, resolve, sep } from 'node:path';
 import { pipeline } from 'node:stream/promises';
@@ -35,7 +34,6 @@ import { freeDiskMb } from '../util/disk.js';
 import {
   bumpAttempts,
   claimNext,
-  expectedChecksums,
   getDownload,
   recoverInterrupted,
   setDestination,
@@ -43,6 +41,7 @@ import {
   setProgress,
   setStatus,
 } from './queue.js';
+import { isAuxiliaryFile, zipEntries } from '../organize/extract.js';
 import {
   DEFAULT_DOWNLOAD_USER_AGENT,
   downloadHeaders,
@@ -97,13 +96,6 @@ async function sizeOf(path: string): Promise<number> {
   } catch {
     return 0;
   }
-}
-
-/** Hash a finished file so it can be checked against the published checksums. */
-async function hashFile(path: string, algo: 'md5' | 'sha1'): Promise<string> {
-  const hash = createHash(algo);
-  await pipeline(createReadStream(path), hash);
-  return hash.digest('hex');
 }
 
 export class DownloadError extends Error {
@@ -247,38 +239,64 @@ export async function transfer(item: DownloadItem, url: string, referer: string)
 /**
  * Verify, then move into place.
  *
- * Checksums come from the vault page and are far stronger than the byte-count
- * check the plan specified: they catch corruption as well as truncation, and
- * they are what makes trusting a resumed transfer reasonable.
+ * ## What the published checksums actually describe
+ *
+ * The vault page's `GoodSha1` / `GoodMd5` / `GoodHash` are the checksums of the
+ * **ROM inside the archive**, not of the archive we download. Verified against
+ * a real download:
+ *
+ *     downloaded 3 Ninjas Kick Back (USA).zip   sha1 921dfd75...
+ *     3 Ninjas Kick Back (USA).sfc inside it    sha1 b619576a...  == GoodSha1
+ *
+ * Hashing the .zip and comparing it to GoodSha1 therefore fails every single
+ * time. The checks are now split to match where the data actually lives:
+ *
+ *   - here, at download time: the byte count against Content-Length, which is
+ *     what catches a truncated transfer, plus the archive's stored CRC32 against
+ *     GoodHash, which confirms we fetched the right ROM. The CRC comes from the
+ *     zip index, so this costs no decompression even for a 4 GB image.
+ *   - at organize time: the extracted ROM's SHA1 against GoodSha1, done while
+ *     the bytes are already being read.
  */
 export async function finalize(item: DownloadItem, partPath: string): Promise<string> {
-  const expect = expectedChecksums(item.id);
   const finalPath = partPath.replace(/\.part$/, '');
   const actualSize = await sizeOf(partPath);
 
-  if (expect.sha1 || expect.md5) {
-    const algo = expect.sha1 ? 'sha1' : 'md5';
-    const want = (expect.sha1 ?? expect.md5)!;
-    const got = await hashFile(partPath, algo);
-    if (got.toLowerCase() !== want.toLowerCase()) {
-      // Do not keep a file that failed verification: a corrupt ROM that looks
-      // fine is worse than no ROM.
-      await unlink(partPath).catch(() => undefined);
-      throw new DownloadError(
-        `${algo} mismatch (expected ${want}, got ${got}) — the partial file was discarded`,
-        true,
-      );
-    }
-  } else {
-    // No published checksum: fall back to the byte count.
-    const fresh = getDownload(item.id);
-    const expected = fresh?.totalBytes ?? 0;
-    if (expected > 0 && actualSize !== expected) {
-      await unlink(partPath).catch(() => undefined);
-      throw new DownloadError(
-        `size mismatch (expected ${expected}, got ${actualSize}) — the partial file was discarded`,
-        true,
-      );
+  // --- truncation -----------------------------------------------------------
+  const fresh = getDownload(item.id);
+  const expected = fresh?.totalBytes ?? 0;
+  if (expected > 0 && actualSize !== expected) {
+    await unlink(partPath).catch(() => undefined);
+    throw new DownloadError(
+      `size mismatch (expected ${expected} bytes, got ${actualSize}) — the partial file was discarded`,
+      true,
+    );
+  }
+
+  // --- identity, via the zip index -----------------------------------------
+  const expectCrc = fresh?.expectCrc32 ?? null;
+  if (expectCrc && /\.zip$/i.test(finalPath)) {
+    try {
+      const entries = await zipEntries(partPath);
+      const content = entries.filter((e) => !isAuxiliaryFile(e.fileName));
+      // Only assert when the archive holds exactly one game file. Multi-track
+      // discs publish one checksum for a set of several, and guessing which it
+      // refers to would produce false failures on valid downloads.
+      if (content.length === 1) {
+        const got = content[0]!.crc32.toLowerCase();
+        if (got !== expectCrc.toLowerCase()) {
+          await unlink(partPath).catch(() => undefined);
+          throw new DownloadError(
+            `content mismatch: the archive contains a file with CRC32 ${got}, but this release publishes ${expectCrc} — the partial file was discarded`,
+            true,
+          );
+        }
+      }
+    } catch (err) {
+      if (err instanceof DownloadError) throw err;
+      // A zip we cannot index is suspicious but not proof of corruption; the
+      // organizer will fail loudly on it rather than us guessing here.
+      console.warn(`download ${item.id}: could not read the archive index (${(err as Error).message})`);
     }
   }
 

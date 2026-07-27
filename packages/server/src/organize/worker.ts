@@ -5,6 +5,7 @@
  * does heavy I/O, so letting it run concurrently with a transfer would have them
  * competing for the same disk and link. One thing at a time, throughout.
  */
+import { existsSync } from 'node:fs';
 import type { DownloadItem } from '@vl-collection-builder/shared';
 import { config } from '../config.js';
 import { getDb } from '../db/client.js';
@@ -28,14 +29,30 @@ async function processOne(item: DownloadItem): Promise<void> {
 
   // Prefer the catalogue's metadata: it is what the naming template is built
   // around, and it was captured at match time rather than guessed from a file.
-  const meta = getDb()
-    .prepare('SELECT name, region, version FROM game WHERE id = ?')
-    .get(item.gameId ?? -1) as
-    | { name: string; region: string | null; version: string | null }
-    | undefined;
+  //
+  // A download queued from the Library has a `game` row. One queued by raw vault
+  // URL does not, so fall back to the mirrored catalogue entry — otherwise the
+  // region is lost and the file lands as `Game.zip` instead of `Game (USA).zip`.
+  const meta =
+    (getDb()
+      .prepare('SELECT name, region, version FROM game WHERE id = ?')
+      .get(item.gameId ?? -1) as
+      | { name: string; region: string | null; version: string | null }
+      | undefined) ??
+    (getDb()
+      .prepare('SELECT title AS name, region, version FROM catalog_entry WHERE platform = ? AND vault_id = ?')
+      .get(item.platform, item.vaultId) as
+      | { name: string; region: string | null; version: string | null }
+      | undefined);
+
+  const expect = getDb()
+    .prepare('SELECT expect_sha1, expect_md5 FROM download WHERE id = ?')
+    .get(item.id) as { expect_sha1: string | null; expect_md5: string | null } | undefined;
 
   const result = await organize({
     downloadId: item.id,
+    expectSha1: expect?.expect_sha1 ?? null,
+    expectMd5: expect?.expect_md5 ?? null,
     gameId: item.gameId,
     platform,
     archivePath: item.destPath,
@@ -105,12 +122,25 @@ export function stopOrganizer(): void {
   stopped = true;
 }
 
-/** Re-organize an already-downloaded item without re-downloading (plan §9.5). */
-export function requeueForOrganize(id: number): boolean {
+/**
+ * Re-organize an already-downloaded item without re-downloading (plan §9.5).
+ *
+ * Only possible while the staging archive still exists, which means KEEP_ARCHIVE
+ * was set — the default consumes it on a successful organize. Returning a reason
+ * beats letting the pipeline surface a bare ENOENT later.
+ */
+export function requeueForOrganize(id: number): { ok: boolean; reason?: string } {
   const item = getDownload(id);
-  if (!item) return false;
-  if (!item.destPath) return false;
+  if (!item) return { ok: false, reason: 'no such download' };
+  if (!item.destPath) return { ok: false, reason: 'no downloaded file is recorded for this item' };
+  if (!existsSync(item.destPath)) {
+    return {
+      ok: false,
+      reason:
+        'the staging archive is gone, so there is nothing to re-organize. It is deleted after a successful organize unless KEEP_ARCHIVE=true. Re-queue the download instead.',
+    };
+  }
   setStatus(id, 'downloaded');
   kickOrganizer();
-  return true;
+  return { ok: true };
 }

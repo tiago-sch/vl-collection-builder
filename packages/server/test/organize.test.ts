@@ -14,9 +14,11 @@ import {
 import { cueReferences, rewriteCcd, rewriteCue, rewriteGdi } from '../src/organize/cue.js';
 import {
   extractZip,
+  isAuxiliaryFile,
   isSafeEntryPath,
   shouldExtract,
   UnsafeArchiveError,
+  zipEntries,
 } from '../src/organize/extract.js';
 import { baseTitle, buildM3u, discNumber, playlistCandidates, sortDiscs } from '../src/organize/m3u.js';
 import { chdCommandFor, shouldConvert } from '../src/organize/chd.js';
@@ -314,3 +316,42 @@ describe('work directory safety', () => {
     expect(isSafeWorkDir('/tmp', '/library', '/downloads')).toBe(false);
   });
 });
+
+describe('archive contents', () => {
+  // Vimm bundles a readme in every archive. Treating it as game content renamed
+  // it after the game AND — because the archive then looked multi-file — pushed
+  // every single-ROM download into its own subfolder.
+  it('recognises the bundled readme as not game content', () => {
+    expect(isAuxiliaryFile("Vimm's Lair.txt")).toBe(true);
+    expect(isAuxiliaryFile('readme.nfo')).toBe(true);
+    expect(isAuxiliaryFile('game.sfc')).toBe(false);
+    expect(isAuxiliaryFile('Track 01.bin')).toBe(false);
+    expect(isAuxiliaryFile('game.cue')).toBe(false);
+  });
+
+  it('reads each entry CRC32 from the zip index without decompressing', async () => {
+    const zipPath = join(dir, 'crc.zip');
+    const staging = join(dir, 'crc-src');
+    mkdirSync(staging, { recursive: true });
+    writeFileSync(join(staging, 'rom.sfc'), 'ROMBYTES');
+    writeFileSync(join(staging, "Vimm's Lair.txt"), 'advert');
+    execFileSync('zip', ['-q', '-r', zipPath, '.'], { cwd: staging });
+
+    const entries = await zipEntries(zipPath);
+    const rom = entries.find((e) => e.fileName === 'rom.sfc')!;
+    expect(rom.crc32).toMatch(/^[0-9a-f]{8}$/);
+    // Matches what `zip -v` reports for the same content.
+    expect(rom.crc32).toBe(crc32Hex(Buffer.from('ROMBYTES')));
+    expect(entries).toHaveLength(2);
+  });
+});
+
+/** Reference CRC32, so the test does not just assert the implementation back. */
+function crc32Hex(buf: Buffer): string {
+  let c = ~0;
+  for (const b of buf) {
+    c ^= b;
+    for (let i = 0; i < 8; i += 1) c = (c >>> 1) ^ (0xedb88320 & -(c & 1));
+  }
+  return ((~c) >>> 0).toString(16).padStart(8, '0');
+}

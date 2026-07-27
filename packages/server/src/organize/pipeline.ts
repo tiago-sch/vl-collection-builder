@@ -9,7 +9,10 @@
  * orphaned work directory and an `organizing` row, both cleaned up on boot with
  * the staging archive still present, so nothing is re-downloaded.
  */
+import { createHash } from 'node:crypto';
+import { createReadStream } from 'node:fs';
 import { copyFile, mkdir, readdir, rename, rm, stat, unlink, writeFile } from 'node:fs/promises';
+import { pipeline } from 'node:stream/promises';
 import { basename, extname, join, resolve, sep } from 'node:path';
 import type { Platform } from '@vl-collection-builder/shared';
 import { config, workPath } from '../config.js';
@@ -19,6 +22,7 @@ import { convertToChd, shouldConvert, type ChdPolicy } from './chd.js';
 import { isSidecar, rewriteSidecar, type RenameMap } from './cue.js';
 import {
   extractZip,
+  isAuxiliaryFile,
   isSupportedArchive,
   shouldExtract,
   uncompressedSize,
@@ -29,6 +33,9 @@ import { parseFolderMap, platformFolder, renderTemplate, sanitizeSegment } from 
 
 export interface OrganizeInput {
   downloadId: number;
+  /** SHA1 of the ROM as published on the vault page, if known. */
+  expectSha1?: string | null;
+  expectMd5?: string | null;
   gameId: number | null;
   platform: Platform;
   archivePath: string;
@@ -62,6 +69,12 @@ function kindOf(fileName: string): string {
   if (ext === 'm3u') return 'm3u';
   if (['zip', '7z', 'rar'].includes(ext)) return 'archive';
   return 'rom';
+}
+
+async function hashFile(path: string, algo: 'md5' | 'sha1'): Promise<string> {
+  const hash = createHash(algo);
+  await pipeline(createReadStream(path), hash);
+  return hash.digest('hex');
 }
 
 async function sizeOf(path: string): Promise<number> {
@@ -144,6 +157,34 @@ export async function organize(input: OrganizeInput): Promise<OrganizeResult> {
     }
 
     if (workFiles.length === 0) throw new Error('the archive produced no files');
+
+    // --- 2b. drop what is not game content ---------------------------------
+    // Every Vimm archive ships a `Vimm's Lair.txt`. Keeping it would rename a
+    // readme after the game, and — because the archive then looks multi-file —
+    // push every single-ROM download into its own subfolder.
+    const auxiliary = workFiles.filter((f) => isAuxiliaryFile(basename(f)));
+    for (const f of auxiliary) await unlink(f).catch(() => undefined);
+    workFiles = workFiles.filter((f) => !isAuxiliaryFile(basename(f)));
+    if (workFiles.length === 0) throw new Error('the archive contained no game files');
+
+    // --- 2c. verify the extracted ROM --------------------------------------
+    // The published checksums describe the ROM, not the archive, so they can
+    // only be checked once the ROM exists on its own. Cartridge systems are
+    // deliberately left zipped (EXTRACT_POLICY=disc-only), and hashing the
+    // archive there would compare a .zip against the ROM's checksum and fail
+    // every time. Those downloads are verified by CRC32 at download time
+    // instead — see download/worker.ts.
+    const extractedForVerification = extract && archiveIsZip;
+    if (extractedForVerification && (input.expectSha1 || input.expectMd5) && workFiles.length === 1) {
+      const algo = input.expectSha1 ? 'sha1' : 'md5';
+      const want = (input.expectSha1 ?? input.expectMd5)!.toLowerCase();
+      const got = await hashFile(workFiles[0]!, algo);
+      if (got !== want) {
+        throw new Error(
+          `${algo} mismatch on the extracted ROM (expected ${want}, got ${got}) — the download is corrupt; retry it`,
+        );
+      }
+    }
 
     // --- 3. rename per template, and rewrite sidecars ----------------------
     //

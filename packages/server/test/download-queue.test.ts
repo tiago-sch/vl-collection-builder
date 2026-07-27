@@ -5,7 +5,8 @@
  */
 import { createServer, type Server } from 'node:http';
 import { createHash } from 'node:crypto';
-import { mkdtempSync, rmSync, writeFileSync, readFileSync, existsSync } from 'node:fs';
+import { execFileSync } from 'node:child_process';
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync, readFileSync, existsSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
@@ -21,10 +22,15 @@ const CONTENT = Buffer.from(
 );
 const CONTENT_SHA1 = createHash('sha1').update(CONTENT).digest('hex');
 
+/** A real zip holding one ROM plus the readme Vimm bundles with every archive. */
+const ROM_BYTES = 'ROMCONTENTS';
+let ZIP: Buffer;
+let ROM_CRC32: string;
+
 let server: Server;
 let baseUrl: string;
 /** Set by tests to make the server misbehave in specific ways. */
-let mode: 'normal' | 'ignore-range' | 'corrupt' | 'truncate' = 'normal';
+let mode: 'normal' | 'ignore-range' | 'corrupt' | 'truncate' | 'zip' = 'normal';
 
 beforeAll(async () => {
   dir = mkdtempSync(join(tmpdir(), 'vault-dl-test-'));
@@ -38,8 +44,18 @@ beforeAll(async () => {
   worker = await import('../src/download/worker.js');
   await db.initDb(() => {});
 
+  const zipSrc = join(dir, 'zipsrc');
+  mkdirSync(zipSrc, { recursive: true });
+  writeFileSync(join(zipSrc, 'game.sfc'), ROM_BYTES);
+  writeFileSync(join(zipSrc, "Vimm's Lair.txt"), 'advert');
+  execFileSync('zip', ['-q', '-r', join(dir, 'test.zip'), '.'], { cwd: zipSrc });
+  ZIP = readFileSync(join(dir, 'test.zip'));
+  const { zipEntries } = await import('../src/organize/extract.js');
+  ROM_CRC32 = (await zipEntries(join(dir, 'test.zip'))).find((e) => e.fileName === 'game.sfc')!.crc32;
+
   server = createServer((req, res) => {
-    const body = mode === 'corrupt' ? Buffer.concat([CONTENT.subarray(0, 100)]) : CONTENT;
+    const body =
+      mode === 'zip' ? ZIP : mode === 'corrupt' ? Buffer.concat([CONTENT.subarray(0, 100)]) : CONTENT;
     const range = mode === 'ignore-range' ? null : req.headers.range;
 
     if (range) {
@@ -219,20 +235,38 @@ describe('transfer and verification', () => {
     mode = 'normal';
   });
 
-  it('discards a file that fails checksum verification', async () => {
-    // A corrupt ROM that looks fine is worse than no ROM, so a failed check
-    // deletes the bytes rather than leaving them to be "fixed" later.
-    mode = 'corrupt';
+  it('rejects an archive whose contents are not the expected ROM', async () => {
+    // The published checksums describe the ROM INSIDE the archive, not the
+    // archive itself — hashing the .zip against GoodSha1 fails every time, which
+    // is what broke every download. At this stage we compare the zip index's
+    // CRC32 against the published one, which identifies the content without
+    // decompressing; the SHA1 of the extracted ROM is checked by the organizer.
+    mode = 'zip';
     const id = queue.enqueue({ ...sample, vaultId: 1004 }).id!;
     queue.setMediaInfo(id, {
       mediaId: 986, disc: null, discTotal: null, fileName: 'Test Game (USA).zip',
-      totalBytes: CONTENT.length, md5: null, sha1: CONTENT_SHA1, crc32: null,
+      totalBytes: ZIP.length, md5: null, sha1: null, crc32: 'deadbeef',
     });
 
     const item = queue.getDownload(id)!;
     const got = await worker.transfer(item, `${baseUrl}/dl`, 'https://vimm.net/vault/1004');
-    await expect(worker.finalize(item, got)).rejects.toThrow(/sha1 mismatch/);
+    await expect(worker.finalize(item, got)).rejects.toThrow(/content mismatch/);
     expect(existsSync(got)).toBe(false);
+    mode = 'normal';
+  });
+
+  it('accepts an archive whose contents match the published CRC32', async () => {
+    mode = 'zip';
+    const id = queue.enqueue({ ...sample, vaultId: 1006 }).id!;
+    queue.setMediaInfo(id, {
+      mediaId: 988, disc: null, discTotal: null, fileName: 'Test Game (USA).zip',
+      totalBytes: ZIP.length, md5: null, sha1: null, crc32: ROM_CRC32,
+    });
+
+    const item = queue.getDownload(id)!;
+    const got = await worker.transfer(item, `${baseUrl}/dl`, 'https://vimm.net/vault/1006');
+    const final = await worker.finalize(item, got);
+    expect(existsSync(final)).toBe(true);
     mode = 'normal';
   });
 
