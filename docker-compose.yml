@@ -1,0 +1,30 @@
+services:
+  vault-lookup:
+    build: .
+    container_name: vault-lookup
+    # Bound to loopback so a stray `docker compose up` doesn't publish this to
+    # the LAN. Put it behind a reverse proxy for remote access (plan §12 q4).
+    ports: ["127.0.0.1:8080:8080"]
+    volumes:
+      - ./data:/data
+    environment:
+      DATABASE_PATH: /data/vault.db
+
+      # --- crawler politeness (plan §11) ---
+      CRAWL_DELAY_MS: "1200"
+      USER_AGENT: "vault-lookup/0.1 (personal catalogue tool)"
+
+      # --- source registry (plan §1.1) ---
+      SOURCES_PATH: ""        # optional: override the embedded registry from a file
+      SOURCES_URL: ""         # optional: fetch the registry from a URL
+
+      # --- first-run setup (plan §6.0) ---
+      REGION_PREFERENCE: ""   # e.g. "USA,Europe,Japan" — pre-fills the wizard
+      SETUP_SKIP: "false"     # true + REGION_PREFERENCE => non-interactive setup
+
+      # --- optional resolver (phase 8; absent key => tier 3 never runs) ---
+      RESOLVER: ""            # "" (off) | gemini | openai | ollama
+      GEMINI_API_KEY: ""
+      RESOLVER_MODEL: ""
+      RESOLVER_MAX_ITEMS: "50"
+    restart: unless-stopped

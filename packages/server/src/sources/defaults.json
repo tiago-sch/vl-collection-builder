@@ -1,0 +1,31 @@
+{
+  "baseUrl": "https://vimm.net",
+  "listPath": "/vault/",
+  "comment": "Slug -> Vimm `system` map. Adopted from gamarr's registry (see plan §1.1, §14) and verified against live listing pages. Override at runtime with SOURCES_PATH or SOURCES_URL; a bad override falls back to this embedded copy rather than failing to boot.",
+  "platforms": [
+    { "slug": "nes", "system": "NES", "label": "Nintendo Entertainment System", "discBased": false },
+    { "slug": "snes", "system": "SNES", "label": "Super Nintendo", "discBased": false },
+    { "slug": "n64", "system": "N64", "label": "Nintendo 64", "discBased": false },
+    { "slug": "ngc", "system": "GameCube", "label": "GameCube", "discBased": true },
+    { "slug": "wii", "system": "Wii", "label": "Wii", "discBased": true },
+    { "slug": "gb", "system": "GB", "label": "Game Boy", "discBased": false },
+    { "slug": "gbc", "system": "GBC", "label": "Game Boy Color", "discBased": false },
+    { "slug": "gba", "system": "GBA", "label": "Game Boy Advance", "discBased": false },
+    { "slug": "nds", "system": "DS", "label": "Nintendo DS", "discBased": false },
+    { "slug": "genesis", "system": "Genesis", "label": "Sega Genesis / Mega Drive", "discBased": false },
+    { "slug": "saturn", "system": "Saturn", "label": "Sega Saturn", "discBased": true },
+    { "slug": "dc", "system": "Dreamcast", "label": "Sega Dreamcast", "discBased": true },
+    { "slug": "psx", "system": "PS1", "label": "PlayStation", "discBased": true },
+    { "slug": "ps2", "system": "PS2", "label": "PlayStation 2", "discBased": true },
+    { "slug": "ps3", "system": "PS3", "label": "PlayStation 3", "discBased": true },
+    { "slug": "psp", "system": "PSP", "label": "PlayStation Portable", "discBased": true },
+    { "slug": "xbox", "system": "Xbox", "label": "Xbox", "discBased": true },
+    { "slug": "xbox360", "system": "Xbox360", "label": "Xbox 360", "discBased": true }
+  ],
+  "folderStyles": {
+    "slug": {},
+    "esde": { "ngc": "gc", "dc": "dreamcast" },
+    "batocera": { "ngc": "gamecube", "dc": "dreamcast", "genesis": "megadrive" },
+    "retroarch": {}
+  }
+}

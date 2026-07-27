@@ -1,0 +1,30 @@
+{
+  "name": "vault-lookup",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Resolve game names to Vimm's Lair Vault page URLs",
+  "license": "MIT",
+  "type": "module",
+  "engines": {
+    "node": ">=22.5.0"
+  },
+  "workspaces": [
+    "packages/shared",
+    "packages/server",
+    "packages/web"
+  ],
+  "scripts": {
+    "build": "npm run build -w @vault-lookup/shared && npm run build -w @vault-lookup/server && npm run build -w @vault-lookup/web",
+    "dev": "npm run dev -w @vault-lookup/server",
+    "dev:web": "npm run dev -w @vault-lookup/web",
+    "start": "node packages/server/dist/index.js",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "typecheck": "tsc -b --pretty"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.2",
+    "typescript": "^5.7.2",
+    "vitest": "^4.1.10"
+  }
+}

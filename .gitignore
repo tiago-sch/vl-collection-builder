@@ -1,0 +1,19 @@
+node_modules/
+dist/
+*.tsbuildinfo
+
+# Runtime data — never commit a catalogue or a library
+data/
+downloads/
+library/
+*.db
+*.db-journal
+*.db-wal
+*.db-shm
+
+.env
+.env.local
+
+.DS_Store
+*.log
+coverage/
