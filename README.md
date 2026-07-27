@@ -335,6 +335,19 @@ To update in Portainer: **Stacks → your stack → Update the stack**, with
 docker compose pull && docker compose up -d
 ```
 
+If you build locally rather than pulling, `up -d` alone will **not** pick up code
+changes — it only recreates when the compose file changes. Rebuild explicitly:
+
+```bash
+docker compose up -d --build
+```
+
+One transitional note for the v0.1 rename: `container_name` changed from
+`vault-lookup` to `vl-collection-builder`, which leaves the old container behind
+as an orphan still holding port 8080. Clear it once with
+`docker compose up -d --build --remove-orphans`. Your data is unaffected — it is
+in the volume, not the container.
+
 Back up by exporting from the Library screen, or by copying the database out:
 
 ```bash
