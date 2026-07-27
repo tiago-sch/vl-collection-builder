@@ -15,6 +15,7 @@ export function Setup({ onDone }: { onDone: () => void }) {
   const [step, setStep] = useState(1);
   const [platforms, setPlatforms] = useState<Platform[]>([]);
   const [platform, setPlatform] = useState('ps2');
+  const [synced, setSynced] = useState<string[]>([]);
   const [regions, setRegions] = useState<string[]>([]);
   const [strict, setStrict] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -25,8 +26,16 @@ export function Setup({ onDone }: { onDone: () => void }) {
 
   useEffect(() => {
     void api.platforms().then((r) => setPlatforms(r.platforms));
-    void api.setupState().then((s) => setRegions(s.suggestedRegionPreference));
+    void api.setupState().then((s) => {
+      setRegions(s.suggestedRegionPreference);
+      setSynced(s.syncedPlatforms);
+    });
   }, []);
+
+  // A catalogue can already exist on first run — a restored volume, or setup
+  // re-run from Settings. Re-crawling it would cost minutes and hit the source
+  // site for nothing, so offer to skip.
+  const alreadySynced = synced.includes(platform);
 
   /**
    * The sync runs in the background through steps 2-3, so the wait costs
@@ -93,9 +102,23 @@ export function Setup({ onDone }: { onDone: () => void }) {
               ))}
             </select>
           </label>
-          <button className="primary" onClick={startSync}>
-            Start sync and continue
-          </button>
+          {alreadySynced ? (
+            <>
+              <div className="banner info">
+                This platform is already mirrored locally — no need to sync it again.
+              </div>
+              <div className="row">
+                <button className="primary" onClick={() => setStep(2)}>
+                  Continue without re-syncing
+                </button>
+                <button onClick={startSync}>Re-sync anyway</button>
+              </div>
+            </>
+          ) : (
+            <button className="primary" onClick={startSync}>
+              Start sync and continue
+            </button>
+          )}
         </div>
       )}
 
