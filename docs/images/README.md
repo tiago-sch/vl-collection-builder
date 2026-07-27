@@ -7,14 +7,19 @@ context, so they add nothing to the image.
 
 Use the screen name, lower-case, hyphenated:
 
-| File | Shows |
-|---|---|
-| `review.png` | The review queue with an ambiguous match — the most useful single screenshot |
-| `import.png` | The Import screen with a pasted list |
-| `library.png` | The saved library with tier badges |
-| `downloads.png` | The download queue mid-transfer |
-| `settings.png` | Settings |
-| `wizard-regions.png` | The first-run region step |
+| File | Shows | In use |
+|---|---|---|
+| `logo.png` | Wordmark, transparent background, 900px | README header |
+| `review_step.png` | The review queue with a genuine 0.79 / 0.79 tie | README |
+| `import_list.png` | The Import screen with a pasted list | README |
+| `downloads.png` | The download queue and a completed transfer | README |
+| `library.png` | The saved library with tier badges | not yet |
+| `settings.png` | Settings | not yet |
+| `wizard-regions.png` | The first-run region step | not yet |
+
+`vl_collection_builder.png` is the full-size source art for the logo. `logo.png`
+is the cropped, resized version the README uses — the source is 2.1 MB against
+326 KB, which matters because git keeps every version of a binary forever.
 
 ## Capturing
 

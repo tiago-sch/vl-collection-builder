@@ -1,4 +1,12 @@
-# VL Collection Builder
+<p align="center">
+  <img src="docs/images/logo.png" alt="VL Collection Builder" width="560">
+</p>
+
+<p align="center">
+  <em>Turn a list of game names into a verified, organized ROM library.</em>
+</p>
+
+---
 
 Paste a list of game names, pick a platform, and get back the Vimm's Lair Vault
 page URL for each one. Ambiguous matches are confirmed by you in a
@@ -9,33 +17,16 @@ emulator-ready library.
 Self-hosted, single container, single port, no external services. No API keys,
 no cloud, nothing to sign up for.
 
-The review queue, with a real ambiguous case — nine names in, eight resolved
-automatically, one worth your attention:
+## The review queue
 
-```
- Review                                              [ Back to import ]
- 8 of 9 settled · 1 left to review
+Two names in — `smw` and `yoshi island` — and only the ambiguous one reaches you:
 
- ( 2 alias )( 6 exact )( 0 fuzzy )( 0 you )        [ Save 8 to library ]
- ─────────────────────────────────────────────────────────────────────
- "Dragon Quest VIII"                                            1 of 1
+![The review queue](docs/images/review_step.png)
 
- ▸ 1  Dragon Quest VIII Premium Eizou Disc            0.81  [ Confirm ]
-      Asia/Japan · v1.01 · vault/67886
-   2  Dragon Quest VIII: Journey of the Cursed King   0.79
-      USA · v1.0 · 8.5 · vault/8203
-   3  Dragon Quest VIII: Journey of the Cursed King   0.79
-      USA · v1.01 · vault/67100
-   4  Dragon Quest VIII: Sora to Umi to Daichi to …   0.68
-      Asia/Japan · v1.02 · 8.5 · vault/68335
- ─────────────────────────────────────────────────────────────────────
- [1]–[9] select · [↑↓] move · [Enter] confirm · [S] skip · [U] paste URL
-```
-
-Note what the scores show: the Japanese bonus disc edges out the game you
-actually want, 0.81 to 0.79, purely because its title is shorter. String
-similarity cannot know better — but the margin between them is 0.02, well under
-the threshold, so it refuses to auto-accept and asks. That is the design working.
+Look at the top two scores: **0.79 and 0.79**. A dead tie, so the margin between
+them is zero, so the matcher refuses to auto-accept and asks. That is the whole
+design in one screenshot — over-eager matching is the expensive failure, because
+a wrong row in your library looks exactly like a right one.
 
 ## What it is
 
@@ -60,6 +51,8 @@ npm install && npm run build && npm start
 ```
 
 ## How matching works
+
+![Import](docs/images/import_list.png)
 
 The whole platform catalogue is mirrored locally once, then your list is matched
 against the local copy. For a 200-game list that is ~75 requests instead of 200+,
@@ -110,6 +103,8 @@ mismatching a Japan-focused collection is the failure that screen exists to
 prevent.
 
 ## Why downloads are serial
+
+![Downloads](docs/images/downloads.png)
 
 **There is no concurrency setting, and that absence is a decision.**
 

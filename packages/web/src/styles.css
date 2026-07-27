@@ -104,7 +104,7 @@ label.field > span { display: block; margin-bottom: 5px; color: var(--muted); fo
 .badge.tier0 { color: var(--good); border-color: #2f5f4a; }
 .badge.tier1 { color: var(--accent); border-color: #2f4a63; }
 .badge.tier2 { color: var(--warn); border-color: #5a4d24; }
-.badge.tier4 { color: var(--muted); }
+.badge.tier3 { color: var(--muted); }
 .badge.owned { color: var(--warn); border-color: #5a4d24; }
 
 table { width: 100%; border-collapse: collapse; }
