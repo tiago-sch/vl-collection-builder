@@ -1,0 +1,327 @@
+{
+  "comment": "Static alias table (plan §4.3). Hand-reviewed, committed, consulted at tier 0. These are the regional renames and abbreviations that pure string matching scores near zero — 're4' against 'Resident Evil 4' scores under 0.5, so no threshold tuning will ever recover it. Keys are matched after normalisation, so case, punctuation and articles do not matter here. `platforms` restricts an alias to specific slugs; omit it to apply everywhere.",
+  "aliases": [
+    {
+      "from": "biohazard",
+      "to": "Resident Evil"
+    },
+    {
+      "from": "biohazard 2",
+      "to": "Resident Evil 2"
+    },
+    {
+      "from": "biohazard 3 last escape",
+      "to": "Resident Evil 3: Nemesis"
+    },
+    {
+      "from": "biohazard 4",
+      "to": "Resident Evil 4"
+    },
+    {
+      "from": "biohazard code veronica",
+      "to": "Resident Evil Code: Veronica"
+    },
+    {
+      "from": "re1",
+      "to": "Resident Evil"
+    },
+    {
+      "from": "re2",
+      "to": "Resident Evil 2"
+    },
+    {
+      "from": "re3",
+      "to": "Resident Evil 3: Nemesis"
+    },
+    {
+      "from": "re4",
+      "to": "Resident Evil 4"
+    },
+    {
+      "from": "rockman",
+      "to": "Mega Man"
+    },
+    {
+      "from": "rockman x",
+      "to": "Mega Man X"
+    },
+    {
+      "from": "rockman 2",
+      "to": "Mega Man 2"
+    },
+    {
+      "from": "rockman 3",
+      "to": "Mega Man 3"
+    },
+    {
+      "from": "rockman dash",
+      "to": "Mega Man Legends"
+    },
+    {
+      "from": "rockman exe",
+      "to": "Mega Man Battle Network"
+    },
+    {
+      "from": "dragon quest",
+      "to": "Dragon Warrior",
+      "platforms": [
+        "nes",
+        "snes",
+        "gb",
+        "gbc"
+      ]
+    },
+    {
+      "from": "dragon quest 1",
+      "to": "Dragon Warrior",
+      "platforms": [
+        "nes"
+      ]
+    },
+    {
+      "from": "dragon quest 2",
+      "to": "Dragon Warrior II",
+      "platforms": [
+        "nes"
+      ]
+    },
+    {
+      "from": "dragon quest 3",
+      "to": "Dragon Warrior III",
+      "platforms": [
+        "nes"
+      ]
+    },
+    {
+      "from": "dragon quest 4",
+      "to": "Dragon Warrior IV",
+      "platforms": [
+        "nes"
+      ]
+    },
+    {
+      "from": "mgs",
+      "to": "Metal Gear Solid"
+    },
+    {
+      "from": "mgs2",
+      "to": "Metal Gear Solid 2: Sons of Liberty"
+    },
+    {
+      "from": "mgs3",
+      "to": "Metal Gear Solid 3: Snake Eater"
+    },
+    {
+      "from": "mgs 2",
+      "to": "Metal Gear Solid 2: Sons of Liberty"
+    },
+    {
+      "from": "mgs 3",
+      "to": "Metal Gear Solid 3: Snake Eater"
+    },
+    {
+      "from": "gta",
+      "to": "Grand Theft Auto"
+    },
+    {
+      "from": "gta 3",
+      "to": "Grand Theft Auto III"
+    },
+    {
+      "from": "gta sa",
+      "to": "Grand Theft Auto: San Andreas"
+    },
+    {
+      "from": "gta san andreas",
+      "to": "Grand Theft Auto: San Andreas"
+    },
+    {
+      "from": "gta vc",
+      "to": "Grand Theft Auto: Vice City"
+    },
+    {
+      "from": "gta vice city",
+      "to": "Grand Theft Auto: Vice City"
+    },
+    {
+      "from": "ff7",
+      "to": "Final Fantasy VII"
+    },
+    {
+      "from": "ff8",
+      "to": "Final Fantasy VIII"
+    },
+    {
+      "from": "ff9",
+      "to": "Final Fantasy IX"
+    },
+    {
+      "from": "ff10",
+      "to": "Final Fantasy X"
+    },
+    {
+      "from": "ff12",
+      "to": "Final Fantasy XII"
+    },
+    {
+      "from": "ffx",
+      "to": "Final Fantasy X"
+    },
+    {
+      "from": "ffx 2",
+      "to": "Final Fantasy X-2"
+    },
+    {
+      "from": "ff tactics",
+      "to": "Final Fantasy Tactics"
+    },
+    {
+      "from": "smt nocturne",
+      "to": "Shin Megami Tensei: Nocturne"
+    },
+    {
+      "from": "smt lucifers call",
+      "to": "Shin Megami Tensei: Nocturne"
+    },
+    {
+      "from": "lucifers call",
+      "to": "Shin Megami Tensei: Nocturne"
+    },
+    {
+      "from": "smt dds",
+      "to": "Shin Megami Tensei: Digital Devil Saga"
+    },
+    {
+      "from": "persona 3 fes",
+      "to": "Shin Megami Tensei: Persona 3 FES"
+    },
+    {
+      "from": "persona 4",
+      "to": "Shin Megami Tensei: Persona 4"
+    },
+    {
+      "from": "persona 3",
+      "to": "Shin Megami Tensei: Persona 3"
+    },
+    {
+      "from": "dmc",
+      "to": "Devil May Cry"
+    },
+    {
+      "from": "dmc3",
+      "to": "Devil May Cry 3: Dante's Awakening"
+    },
+    {
+      "from": "dmc 3",
+      "to": "Devil May Cry 3: Dante's Awakening"
+    },
+    {
+      "from": "ssx3",
+      "to": "SSX 3"
+    },
+    {
+      "from": "kh",
+      "to": "Kingdom Hearts"
+    },
+    {
+      "from": "kh2",
+      "to": "Kingdom Hearts II"
+    },
+    {
+      "from": "sotc",
+      "to": "Shadow of the Colossus"
+    },
+    {
+      "from": "wanda to kyozou",
+      "to": "Shadow of the Colossus"
+    },
+    {
+      "from": "katamari",
+      "to": "Katamari Damacy"
+    },
+    {
+      "from": "sh2",
+      "to": "Silent Hill 2"
+    },
+    {
+      "from": "sh3",
+      "to": "Silent Hill 3"
+    },
+    {
+      "from": "sh4",
+      "to": "Silent Hill 4: The Room"
+    },
+    {
+      "from": "zelda oot",
+      "to": "Legend of Zelda, The: Ocarina of Time"
+    },
+    {
+      "from": "oot",
+      "to": "Legend of Zelda, The: Ocarina of Time"
+    },
+    {
+      "from": "majoras mask",
+      "to": "Legend of Zelda, The: Majora's Mask"
+    },
+    {
+      "from": "link to the past",
+      "to": "Legend of Zelda, The: A Link to the Past"
+    },
+    {
+      "from": "alttp",
+      "to": "Legend of Zelda, The: A Link to the Past"
+    },
+    {
+      "from": "smw",
+      "to": "Super Mario World"
+    },
+    {
+      "from": "sm64",
+      "to": "Super Mario 64"
+    },
+    {
+      "from": "smb3",
+      "to": "Super Mario Bros. 3"
+    },
+    {
+      "from": "smrpg",
+      "to": "Super Mario RPG: Legend of the Seven Stars"
+    },
+    {
+      "from": "dkc",
+      "to": "Donkey Kong Country"
+    },
+    {
+      "from": "ct",
+      "to": "Chrono Trigger"
+    },
+    {
+      "from": "fzero",
+      "to": "F-Zero"
+    },
+    {
+      "from": "sf2",
+      "to": "Street Fighter II"
+    },
+    {
+      "from": "sfa3",
+      "to": "Street Fighter Alpha 3"
+    },
+    {
+      "from": "mvc2",
+      "to": "Marvel vs. Capcom 2"
+    },
+    {
+      "from": "pokemon red",
+      "to": "Pokemon Red Version"
+    },
+    {
+      "from": "pokemon blue",
+      "to": "Pokemon Blue Version"
+    },
+    {
+      "from": "pokemon yellow",
+      "to": "Pokemon Yellow Version"
+    }
+  ]
+}

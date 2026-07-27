@@ -2,10 +2,17 @@ node_modules/
 dist/
 *.tsbuildinfo
 
-# Runtime data — never commit a catalogue or a library
-data/
-downloads/
-library/
+# Runtime data — never commit a catalogue or a library.
+#
+# These are anchored with a leading slash so they match the repo ROOT only.
+# Unanchored, git matches a directory name at ANY depth, which silently
+# swallowed packages/server/data/aliases.json — the entire tier-0 alias table
+# was missing from the repository while working fine on the machine that wrote
+# it. (Note this is the opposite of .dockerignore, which matches only the root
+# unless you write `**/`.)
+/data/
+/downloads/
+/library/
 *.db
 *.db-journal
 *.db-wal
