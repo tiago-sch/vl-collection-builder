@@ -132,6 +132,37 @@ rediscover:
 - **Multi-track is not multi-disc.** Naming every file in a CD rip after the game
   collapses the tracks onto one filename.
 
+## CI
+
+`.github/workflows/ci.yml` runs on every push and pull request:
+
+1. **test** — `npm ci`, build, typecheck, and the full test suite on Node 24.
+2. **image** — builds `linux/amd64` and `linux/arm64` and pushes to GHCR. Pull
+   requests build but do not push.
+
+The image job finishes with a smoke test: it runs the built image, waits for
+`/api/health`, and asserts that `chdman` is present and that unattended setup
+applied. Both are things that fail *silently* rather than loudly — a missing
+chdman just skips CHD conversion with a per-item warning.
+
+### Why the build stage pins `--platform=$BUILDPLATFORM`
+
+The build runs natively on the runner's architecture instead of under QEMU. That
+is only safe because there are no native addons — `node:sqlite` is built in, and
+every runtime dependency is pure JavaScript, so the compiled output and the
+pruned `node_modules` are architecture-independent. If a native dependency is
+ever added, this must change or arm64 images will ship amd64 binaries.
+
+### `.dockerignore` gotcha
+
+`.dockerignore` does **not** match basenames at any depth the way `.gitignore`
+does: a bare `*.tsbuildinfo` matches only the context root. Every pattern needs
+its `**/` twin.
+
+This one is not loud. A stale `packages/*/tsconfig.tsbuildinfo` copied in from a
+developer's machine makes `tsc -b` believe the build is already up to date, so it
+emits nothing and the image ships without `dist`.
+
 ## Container user
 
 The image runs as uid/gid 1000 (`node`). There is no `PUID`/`PGID` entrypoint —

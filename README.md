@@ -280,7 +280,32 @@ AI at all, and two of the three misses were games that are not on the platform.
 The shipped [`docker-compose.yml`](docker-compose.yml) mounts three volumes and
 binds to loopback. Adjust the paths and run `docker compose up -d`.
 
-### NAS + Portainer
+### Portainer
+
+CI publishes a multi-arch image to GHCR on every push to `main`, so Portainer
+pulls a prebuilt image rather than building from source:
+
+```
+ghcr.io/tiago-sch/vl-collection-builder:latest
+```
+
+Built for `linux/amd64` and `linux/arm64`, so it runs on a normal server and on a
+Synology or Raspberry Pi alike.
+
+Paste [`docker-compose.portainer.yml`](docker-compose.portainer.yml) into
+Portainer as a Stack (**Stacks → Add stack → Web editor**) and adjust the two NAS
+paths and the `user:` line.
+
+> **Before the first deploy:** a newly created GHCR package is **private**, and
+> the pull will fail with `denied`. Either make it public once, under
+> *Packages → vl-collection-builder → Package settings → Change visibility*, or
+> add a registry in Portainer using a GitHub personal access token with the
+> `read:packages` scope.
+
+Available tags: `latest` (main), `sha-<short>` for a specific commit, and
+`v1.2.3` / `v1.2` if you push a version tag.
+
+### NAS paths
 
 All three paths are independent, and nothing has to live at the root of your
 share.

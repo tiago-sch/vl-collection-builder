@@ -1,0 +1,47 @@
+# Keep the build context small and reproducible.
+#
+# Without this the context is ~138 MB — node_modules, build output and your
+# actual catalogue database all get shipped to the daemon on every build. The
+# Dockerfile runs `npm ci` and `npm run build` itself, so none of it is wanted;
+# copying host build output in would also mean the image could contain artifacts
+# that were never built from the committed source.
+
+# NOTE: .dockerignore does NOT match basenames at any depth the way .gitignore
+# does — a bare `*.tsbuildinfo` matches only the context root. Every pattern
+# below therefore needs its `**/` twin.
+#
+# Getting this wrong is not loud. A stale packages/*/tsconfig.tsbuildinfo copied
+# from the host makes `tsc -b` believe the build is already up to date, so it
+# emits nothing, and the image ends up missing dist entirely.
+node_modules
+**/node_modules
+dist
+**/dist
+*.tsbuildinfo
+**/*.tsbuildinfo
+
+# Runtime data — never build a database or someone's library into an image
+data
+downloads
+library
+*.db
+*.db-journal
+*.db-wal
+*.db-shm
+
+.git
+.github
+.gitignore
+.env
+.env.local
+
+# Tests and fixtures are not needed at runtime and are the bulk of the source
+**/test
+coverage
+
+# Docs — not needed at runtime
+*.md
+docs
+
+.DS_Store
+*.log

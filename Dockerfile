@@ -4,7 +4,17 @@
 # the builder and no architecture-specific binary in the runtime image.
 
 # ---------------------------------------------------------------------------
-FROM node:24-bookworm-slim AS build
+# The build stage runs natively on the BUILDER's architecture, not the target's.
+#
+# That is only safe because there are no native addons: node:sqlite is built in,
+# and every runtime dependency (fastify, cheerio, yauzl) is pure JavaScript, so
+# the compiled output and the pruned node_modules are architecture-independent.
+# `npm prune --omit=dev` removes the one exception — esbuild/vite ship platform
+# binaries, and they are build-time only.
+#
+# The payoff is that a linux/arm64 image (Synology, Raspberry Pi) does not have
+# to run npm and tsc under QEMU emulation, which turns minutes into seconds.
+FROM --platform=$BUILDPLATFORM node:24-bookworm-slim AS build
 WORKDIR /app
 
 # Manifests first so `npm ci` is cached independently of source changes.

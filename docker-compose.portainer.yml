@@ -1,0 +1,72 @@
+# Portainer stack — pulls the prebuilt image from GHCR instead of building.
+#
+# Paste this into Portainer as a Stack (Stacks -> Add stack -> Web editor) and
+# adjust the two NAS paths and the `user:` line. Nothing else needs changing.
+#
+# The image is built by .github/workflows/ci.yml for linux/amd64 and linux/arm64,
+# so this works on a normal server and on a Synology/Raspberry Pi alike.
+#
+# BEFORE THE FIRST DEPLOY: a new GHCR package is PRIVATE by default and the pull
+# will fail with "denied". Either make it public once —
+#   github.com/users/tiago-sch/packages/container/vl-collection-builder/settings
+#   -> Change visibility -> Public
+# or add a registry with a GitHub personal access token (read:packages scope) in
+# Portainer under Registries.
+
+services:
+  vault-lookup:
+    image: ghcr.io/tiago-sch/vl-collection-builder:latest
+    container_name: vault-lookup
+
+    # Loopback only. Put a reverse proxy in front for remote access; publishing
+    # this straight onto a LAN gives anyone on it control of your downloads.
+    ports:
+      - "127.0.0.1:8080:8080"
+
+    volumes:
+      # SQLite — a LOCAL named volume, never a NAS path. SQLite's locking is
+      # unreliable over NFS/CIFS and the failure mode is silent corruption, not
+      # an error. It is only tens of MB. Back it up by exporting from the UI.
+      - vaultlookup-data:/data
+
+      # Staging (raw archives, disposable) and the organized library. Change
+      # these two to your own paths; they resolve on the DOCKER HOST, not
+      # inside Portainer.
+      - /mnt/media/roms/.staging:/downloads
+      - /mnt/media/roms/library:/library
+
+    # The image runs as uid/gid 1000. If your share is owned by a different
+    # user, set it here — `id -u` and `id -g` on the host. This image has no
+    # PUID/PGID entrypoint, so setting those would be silently ignored.
+    user: "1000:1000"
+
+    environment:
+      DATABASE_PATH: /data/vault.db
+      DOWNLOADS_PATH: /downloads
+      LIBRARY_PATH: /library
+      WORK_PATH: /library/.tmp
+
+      # Leave empty to be asked in the first-run wizard. Set both of these to
+      # complete setup unattended — SETUP_SKIP alone does nothing, because
+      # guessing your region preference is the failure it exists to prevent.
+      REGION_PREFERENCE: ""
+      SETUP_SKIP: "false"
+
+      # Politeness. There is deliberately no download concurrency setting — see
+      # "Why downloads are serial" in the README.
+      CRAWL_DELAY_MS: "1200"
+      INTER_DOWNLOAD_DELAY_MS: "3000"
+
+      # Set to match your front-end: slug | esde | batocera | retroarch.
+      # A mismatch is not a data error — the front-end just shows an empty
+      # system and the games look missing.
+      PLATFORM_FOLDER_STYLE: "slug"
+
+      NAMING_TEMPLATE: "{title} ({region})"
+      EXTRACT_POLICY: "disc-only"
+      CHD_POLICY: "disc-only"
+
+    restart: unless-stopped
+
+volumes:
+  vaultlookup-data:
