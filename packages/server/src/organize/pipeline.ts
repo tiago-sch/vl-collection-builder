@@ -10,7 +10,7 @@
  * the staging archive still present, so nothing is re-downloaded.
  */
 import { copyFile, mkdir, readdir, rename, rm, stat, unlink, writeFile } from 'node:fs/promises';
-import { basename, extname, join, resolve } from 'node:path';
+import { basename, extname, join, resolve, sep } from 'node:path';
 import type { Platform } from '@vault-lookup/shared';
 import { config, workPath } from '../config.js';
 import { loadRegistry } from '../sources/load.js';
@@ -317,9 +317,43 @@ export async function organize(input: OrganizeInput): Promise<OrganizeResult> {
   }
 }
 
-/** Remove orphaned work directories left by a crash (plan §9.5). */
+/**
+ * Is this work directory safe to empty at boot?
+ *
+ * `cleanWorkDir` deletes everything inside WORK_PATH, which is correct for a
+ * scratch directory and catastrophic for anything else. A single misconfigured
+ * `WORK_PATH=/library` would erase an entire ROM library on the next restart,
+ * silently and with no way back.
+ *
+ * So the directory must be a strict subdirectory of the library or downloads
+ * root — never equal to one of them, and never a parent of one.
+ */
+export function isSafeWorkDir(work: string, library: string, downloads: string): boolean {
+  const w = resolve(work);
+  const protectedRoots = [resolve(library), resolve(downloads)];
+
+  for (const root of protectedRoots) {
+    if (w === root) return false;
+    // A work dir ABOVE a protected root would take it with it.
+    if (root.startsWith(w + sep)) return false;
+  }
+  // Refuse anything suspiciously close to the filesystem root.
+  if (w === sep || w.split(sep).filter(Boolean).length < 2) return false;
+
+  return true;
+}
+
+/**
+ * Remove orphaned work directories left by a crash (plan §9.5).
+ *
+ * Refuses to run if WORK_PATH is not a safe scratch location — see
+ * `isSafeWorkDir`. Returns -1 in that case so the caller can warn loudly rather
+ * than silently skipping cleanup.
+ */
 export async function cleanWorkDir(): Promise<number> {
   const root = workPath();
+  if (!isSafeWorkDir(root, config.libraryPath, config.downloadsPath)) return -1;
+
   try {
     const entries = await readdir(root);
     for (const e of entries) await rm(join(root, e), { recursive: true, force: true });

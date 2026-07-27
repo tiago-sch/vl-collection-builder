@@ -20,6 +20,7 @@ import {
 } from '../src/organize/extract.js';
 import { baseTitle, buildM3u, discNumber, playlistCandidates, sortDiscs } from '../src/organize/m3u.js';
 import { chdCommandFor, shouldConvert } from '../src/organize/chd.js';
+import { isSafeWorkDir } from '../src/organize/pipeline.js';
 
 let dir: string;
 
@@ -284,5 +285,32 @@ describe('chd', () => {
     expect(shouldConvert('disc-only', true)).toBe(true);
     expect(shouldConvert('disc-only', false)).toBe(false);
     expect(shouldConvert('never', true)).toBe(false);
+  });
+});
+
+describe('work directory safety', () => {
+  // cleanWorkDir empties WORK_PATH on every boot. That is correct for a scratch
+  // directory and catastrophic for anything else: one misconfigured
+  // WORK_PATH=/library would erase a whole ROM library on the next restart.
+  it('accepts a scratch subdirectory', () => {
+    expect(isSafeWorkDir('/library/.tmp', '/library', '/downloads')).toBe(true);
+    expect(isSafeWorkDir('/downloads/.work', '/library', '/downloads')).toBe(true);
+    expect(isSafeWorkDir('/mnt/fast/scratch', '/library', '/downloads')).toBe(true);
+  });
+
+  it('refuses the library or downloads root itself', () => {
+    expect(isSafeWorkDir('/library', '/library', '/downloads')).toBe(false);
+    expect(isSafeWorkDir('/downloads', '/library', '/downloads')).toBe(false);
+    // Trailing slash and relative forms must not sneak past.
+    expect(isSafeWorkDir('/library/', '/library', '/downloads')).toBe(false);
+  });
+
+  it('refuses a parent of a protected root, which would take it along', () => {
+    expect(isSafeWorkDir('/mnt/media', '/mnt/media/library', '/mnt/media/staging')).toBe(false);
+  });
+
+  it('refuses paths too close to the filesystem root', () => {
+    expect(isSafeWorkDir('/', '/library', '/downloads')).toBe(false);
+    expect(isSafeWorkDir('/tmp', '/library', '/downloads')).toBe(false);
   });
 });

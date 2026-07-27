@@ -305,6 +305,42 @@ paths and the `user:` line.
 Available tags: `latest` (main), `sha-<short>` for a specific commit, and
 `v1.2.3` / `v1.2` if you push a version tag.
 
+### Upgrading
+
+**Redeploying a new image does not touch your data.** The database, downloads and
+library all live in volumes; the image contains only code. Verified by writing a
+library entry and a learned alias, replacing the image, and confirming the
+library, aliases, completed setup and region preference all survived.
+
+Schema changes are handled by forward-only migrations applied automatically at
+boot. They add; they do not drop.
+
+Three things *will* lose data, and none of them are the upgrade itself:
+
+- **Renaming the stack.** Compose namespaces named volumes by project name, so
+  `vault-lookup` and `vaultlookup` produce
+  `vault-lookup_vaultlookup-data` and `vaultlookup_vaultlookup-data` — two
+  different volumes. Redeploying under a new stack name gives you an empty
+  database that looks exactly like data loss. Keep the stack name stable.
+- **`docker compose down -v`**, or ticking the volume-removal option when
+  deleting a stack in Portainer. The `-v` is the whole difference.
+- **Rolling back to an older image after a newer migration has run.** Migrations
+  are forward-only; older code will not understand a newer schema. Export your
+  library first if you plan to downgrade.
+
+To update in Portainer: **Stacks → your stack → Update the stack**, with
+*Re-pull image* ticked. To update with compose:
+
+```bash
+docker compose pull && docker compose up -d
+```
+
+Back up by exporting from the Library screen, or by copying the database out:
+
+```bash
+docker cp vault-lookup:/data/vault.db ./vault-backup.db
+```
+
 ### NAS paths
 
 All three paths are independent, and nothing has to live at the root of your

@@ -12,6 +12,7 @@ import { config, workPath } from './config.js';
 import { freeDiskMb, isWritable } from './util/disk.js';
 import { loadRegistry } from './sources/load.js';
 import { parseFolderMap, validateFolderMap } from './organize/naming.js';
+import { isSafeWorkDir } from './organize/pipeline.js';
 
 export interface PreflightResult {
   ok: boolean;
@@ -91,6 +92,15 @@ export async function preflight(): Promise<PreflightResult> {
     const work = workPath();
     if (!(await isWritable(work))) {
       errors.push(`WORK_PATH is not writable: ${work}`);
+    }
+
+    // The work directory is emptied on every boot. If it is not a strict
+    // subdirectory of the library or downloads root, that would delete real
+    // data — so refuse to start rather than do it once and be asked why.
+    if (!isSafeWorkDir(work, config.libraryPath, config.downloadsPath)) {
+      errors.push(
+        `WORK_PATH (${work}) is not a safe scratch directory: it is, or contains, LIBRARY_PATH (${config.libraryPath}) or DOWNLOADS_PATH (${config.downloadsPath}). This directory is emptied on every start, so using it would delete your library. Point it at a subdirectory such as ${config.libraryPath}/.tmp.`,
+      );
     }
 
     // A work dir on a different filesystem turns the final atomic rename into a

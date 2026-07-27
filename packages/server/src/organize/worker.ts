@@ -90,7 +90,11 @@ export async function startOrganizer(log: (m: string) => void = console.log): Pr
     return;
   }
   const cleaned = await cleanWorkDir();
-  if (cleaned > 0) {
+  if (cleaned === -1) {
+    log(
+      'organizer: WORK_PATH is not a safe scratch directory (it is, or contains, LIBRARY_PATH or DOWNLOADS_PATH). Startup cleanup was SKIPPED to avoid deleting your library — point WORK_PATH at a subdirectory such as {LIBRARY_PATH}/.tmp.',
+    );
+  } else if (cleaned > 0) {
     log(`organizer: removed ${cleaned} orphaned work director(ies) left by an interrupted run`);
   }
   stopped = false;

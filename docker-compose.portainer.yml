@@ -13,6 +13,11 @@
 # or add a registry with a GitHub personal access token (read:packages scope) in
 # Portainer under Registries.
 
+# UPGRADING: redeploying a new image does not touch your data — it lives in the
+# volumes below, not the image. But note that Compose namespaces named volumes by
+# STACK NAME, so renaming this stack silently gives you a fresh, empty database.
+# Keep the stack name stable, and do not tick "remove volumes" when updating.
+
 services:
   vault-lookup:
     image: ghcr.io/tiago-sch/vl-collection-builder:latest
