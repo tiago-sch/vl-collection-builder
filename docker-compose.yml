@@ -6,9 +6,21 @@ services:
     # the LAN. Put it behind a reverse proxy for remote access (plan §12 q4).
     ports: ["127.0.0.1:8080:8080"]
     volumes:
+      # SQLite. Keep this on LOCAL disk — never a NAS path. SQLite's locking is
+      # unreliable over NFS/CIFS and the documented failure mode is silent
+      # corruption, not a clean error (plan §9.6b).
       - ./data:/data
+      # Staging: raw archives exactly as served. Disposable, can live on a fast
+      # scratch disk.
+      - ./downloads:/downloads
+      # The organized output. This is what you point emulators at, and what you
+      # back up. Point it at an NFS/SMB mount to land straight on a NAS.
+      - ./library:/library
     environment:
+      # --- paths (all three independently mountable) ---
       DATABASE_PATH: /data/vault.db
+      DOWNLOADS_PATH: /downloads
+      LIBRARY_PATH: /library
 
       # --- crawler politeness (plan §11) ---
       CRAWL_DELAY_MS: "1200"
@@ -22,8 +34,37 @@ services:
       REGION_PREFERENCE: ""   # e.g. "USA,Europe,Japan" — pre-fills the wizard
       SETUP_SKIP: "false"     # true + REGION_PREFERENCE => non-interactive setup
 
-      # --- optional resolver (phase 8; absent key => tier 3 never runs) ---
-      RESOLVER: ""            # "" (off) | gemini | openai | ollama
+      # --- downloads (plan §8) ---
+      # Note the absence of a concurrency variable. The worker is a single loop
+      # by construction, not a pool sized to 1: Vimm's operator has stated
+      # downloads are one at a time, and vl-downloader's author asks the same.
+      # See §8.0 — this is a decision, not an oversight.
+      DOWNLOADS_ENABLED: "true"
+      INTER_DOWNLOAD_DELAY_MS: "3000"  # deliberate pause between files
+      DOWNLOAD_RETRY_LIMIT: "3"
+      DOWNLOAD_TIMEOUT_MS: "0"         # 0 = no timeout; ROMs are large
+      MIN_FREE_DISK_MB: "2048"
+      # The download host rejects our honest crawler UA with 400. Crawling keeps
+      # the honest UA; leave this empty to use the built-in browser UA for the
+      # download endpoint only, or set your own.
+      DOWNLOAD_USER_AGENT: ""
+
+      # --- organizing (plan §9) ---
+      ORGANIZE_ENABLED: "true"
+      EXTRACT_POLICY: "disc-only"      # disc-only | always | never
+      KEEP_ARCHIVE: "false"            # true = re-organize without re-downloading
+      NAMING_TEMPLATE: "{title} ({region})"
+      PLATFORM_FOLDER_STYLE: "slug"    # slug | esde | batocera | retroarch
+      PLATFORM_FOLDER_MAP: ""          # per-platform overrides, e.g. "genesis=megadrive"
+      GENERATE_M3U: "true"
+      REWRITE_CUE_PATHS: "true"
+      CHD_POLICY: "disc-only"          # disc-only | never
+      CHD_KEEP_SOURCE: "false"
+      WORK_PATH: ""                    # default: /library/.tmp — see §9.6b for NAS
+      ORGANIZE_MIN_FREE_DISK_MB: "4096"
+
+      # --- optional resolver (phase 8, not built; absent key => tier 3 skipped) ---
+      RESOLVER: ""
       GEMINI_API_KEY: ""
       RESOLVER_MODEL: ""
       RESOLVER_MAX_ITEMS: "50"

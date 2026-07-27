@@ -308,6 +308,12 @@ async function processOne(item: DownloadItem): Promise<void> {
   // lifecycle. With organizing off, the routes present this as done.
   setStatus(item.id, config.organizeEnabled ? 'downloaded' : 'completed');
 
+  // Hand off to the organizer, which runs in the same serial pipeline.
+  if (config.organizeEnabled) {
+    const { kickOrganizer } = await import('../organize/worker.js');
+    kickOrganizer();
+  }
+
   const done = getDownload(item.id);
   emit({
     id: item.id,

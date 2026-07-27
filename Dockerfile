@@ -24,10 +24,20 @@ RUN npm prune --omit=dev
 FROM node:24-bookworm-slim AS runtime
 WORKDIR /app
 
+# chdman, from the MAME toolchain (~30-40 MB). It packs .bin/.cue and .iso into a
+# single compressed .chd, typically 40-60% smaller with no data loss — for a PS2
+# or PS1 library that is the difference between 400 GB and roughly 200. Given
+# that, the image cost is not a close call (plan §9.5b).
+RUN apt-get update \
+ && apt-get install -y --no-install-recommends mame-tools \
+ && rm -rf /var/lib/apt/lists/*
+
 ENV NODE_ENV=production \
     PORT=8080 \
     HOST=0.0.0.0 \
     DATABASE_PATH=/data/vault.db \
+    DOWNLOADS_PATH=/downloads \
+    LIBRARY_PATH=/library \
     WEB_ROOT=/app/packages/web/dist
 
 COPY --from=build /app/node_modules              ./node_modules
@@ -38,10 +48,11 @@ COPY --from=build /app/packages/server/dist      ./packages/server/dist
 COPY --from=build /app/packages/server/package.json ./packages/server/package.json
 COPY --from=build /app/packages/web/dist         ./packages/web/dist
 
-RUN mkdir -p /data && chown -R node:node /data /app
+RUN mkdir -p /data /downloads /library \
+ && chown -R node:node /data /downloads /library /app
 USER node
 
-VOLUME ["/data"]
+VOLUME ["/data", "/downloads", "/library"]
 EXPOSE 8080
 
 HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \

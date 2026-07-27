@@ -12,6 +12,8 @@ import { initDb, closeDb } from './db/client.js';
 import { loadRegistry } from './sources/load.js';
 import { registerRoutes } from './routes/index.js';
 import { startWorker, stopWorker } from './download/worker.js';
+import { startOrganizer, stopOrganizer } from './organize/worker.js';
+import { preflight } from './preflight.js';
 
 async function main(): Promise<void> {
   const app = Fastify({
@@ -27,11 +29,23 @@ async function main(): Promise<void> {
   for (const w of warnings) app.log.warn(w);
   app.log.info(`source registry loaded: ${registry.platforms.length} platforms, base ${registry.baseUrl}`);
 
+  // Verify paths before anything writes to them. Failing here with a clear
+  // message beats failing after a 4 GB download (plan §9.6b).
+  const checks = await preflight();
+  for (const i of checks.info) app.log.info(i);
+  for (const w of checks.warnings) app.log.warn(w);
+  for (const e of checks.errors) app.log.error(e);
+  if (!checks.ok) {
+    app.log.error('startup preflight failed — fix the paths above and restart');
+    process.exit(1);
+  }
+
   await registerRoutes(app);
 
   // Crash recovery runs here: anything left mid-transfer goes back to the queue
   // with its .part intact, so an interrupted 4 GB image costs seconds, not GB.
   startWorker((m) => app.log.info(m));
+  await startOrganizer((m) => app.log.info(m));
 
   // Static client. WEB_ROOT is empty in dev, where Vite serves the client itself
   // and proxies /api back here.
@@ -54,6 +68,7 @@ async function main(): Promise<void> {
   const shutdown = async (signal: string): Promise<void> => {
     app.log.info(`${signal} received, shutting down`);
     stopWorker();
+    stopOrganizer();
     await app.close();
     closeDb();
     process.exit(0);
