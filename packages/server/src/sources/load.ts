@@ -16,6 +16,12 @@ export interface SourceRegistry {
   baseUrl: string;
   listPath: string;
   platforms: Platform[];
+  /**
+   * Query parameters appended to every listing request to defeat the site's
+   * default filters. Without these the mirror is USA-only and newest-version-only
+   * — see the comment in defaults.json.
+   */
+  listFilters: Record<string, string | string[]>;
   folderStyles: Record<string, Record<string, string>>;
 }
 
@@ -58,6 +64,10 @@ function validate(raw: unknown): SourceRegistry {
     baseUrl: r.baseUrl.replace(/\/+$/, ''),
     listPath: typeof r.listPath === 'string' && r.listPath ? r.listPath : '/vault/',
     platforms,
+    listFilters:
+      typeof r.listFilters === 'object' && r.listFilters !== null
+        ? (r.listFilters as Record<string, string | string[]>)
+        : {},
     folderStyles:
       typeof r.folderStyles === 'object' && r.folderStyles !== null
         ? (r.folderStyles as Record<string, Record<string, string>>)

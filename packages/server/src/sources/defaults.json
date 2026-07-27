@@ -2,6 +2,23 @@
   "baseUrl": "https://vimm.net",
   "listPath": "/vault/",
   "comment": "Slug -> Vimm `system` map. Adopted from gamarr's registry (see plan §1.1, §14) and verified against live listing pages. Override at runtime with SOURCES_PATH or SOURCES_URL; a bad override falls back to this embedded copy rather than failing to boot.",
+  "listFiltersComment": "The listing view is FILTERED BY DEFAULT and the defaults are narrow: only four regions are checked, only the newest version of each game, first disc only, and no prototypes/demos/unlicensed/bonus discs. Mirroring without these produces a USA-only catalogue — a PS2 sync returns 1,831 rows instead of ~11,800, and a Japan-focused collection would find almost nothing. The filter form is method=GET (action=filters), so every option is a query parameter. countries[] enumerates every region Vimm offers.",
+  "listFilters": {
+    "action": "filters",
+    "version": "all",
+    "discs": "all",
+    "translated": "1",
+    "prototype": "1",
+    "demo": "1",
+    "unlicensed": "1",
+    "bonus": "1",
+    "countries[]": [
+      "1", "2", "3", "4", "5", "6", "7", "8", "9", "10", "11", "12", "13", "14",
+      "15", "16", "17", "18", "19", "20", "21", "22", "23", "24", "25", "26",
+      "27", "28", "29", "30", "31", "32", "33", "34", "35", "36", "37", "38",
+      "39", "40", "41", "42", "43"
+    ]
+  },
   "platforms": [
     { "slug": "nes", "system": "NES", "label": "Nintendo Entertainment System", "discBased": false },
     { "slug": "snes", "system": "SNES", "label": "Super Nintendo", "discBased": false },

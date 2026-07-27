@@ -93,9 +93,14 @@ function maybeCompleteSetup(database: DatabaseSync, log: (m: string) => void): v
     return;
   }
 
-  database
-    .prepare('INSERT INTO settings (key, value, updated_at) VALUES (?, ?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value, updated_at = excluded.updated_at')
-    .run('setup_completed_at', nowIso(), nowIso());
+  const upsert = database.prepare(
+    'INSERT INTO settings (key, value, updated_at) VALUES (?, ?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value, updated_at = excluded.updated_at',
+  );
+  // Write the preference itself, not just the completion flag. seedSettings uses
+  // DO NOTHING, so on a database that already exists the env value would
+  // otherwise be ignored and matching would run with an empty region policy.
+  upsert.run('region_preference', JSON.stringify(config.regionPreference), nowIso());
+  upsert.run('setup_completed_at', nowIso(), nowIso());
   log(`setup completed unattended with region preference ${config.regionPreference.join(' > ')}`);
 }
 
