@@ -2,6 +2,7 @@ import type {
   AppSettings,
   DownloadItem,
   DownloadProgress,
+  LibraryFile,
   CatalogSyncState,
   Game,
   Job,
@@ -143,6 +144,34 @@ export const api = {
       `/downloads/${id}${deletePart ? '?deletePart=true' : ''}`,
       { method: 'DELETE' },
     ),
+
+  libraryFiles: (platform?: string) =>
+    request<{ files: LibraryFile[] }>(`/library/files${platform ? `?platform=${platform}` : ''}`),
+
+  libraryStatus: () =>
+    request<{
+      enabled: boolean;
+      organizing: boolean;
+      libraryPath: string;
+      workPath: string;
+      namingTemplate: string;
+      extractPolicy: string;
+      chdPolicy: string;
+      chdmanAvailable: boolean;
+      platformFolderStyle: string;
+      freeDiskMb: number | null;
+      folderMapWarnings: string[];
+      folders: { slug: string; folder: string }[];
+    }>('/library/status'),
+
+  namingPreview: (template: string) =>
+    request<{
+      template: string;
+      examples: { input: Record<string, unknown>; rendered: string }[];
+    }>(`/library/preview?template=${encodeURIComponent(template)}`),
+
+  reorganize: (id: number) =>
+    request<{ queued: boolean }>(`/downloads/${id}/reorganize`, { method: 'POST' }),
 
   liveSearch: (platform: string, q: string) =>
     request<{ results: { vaultId: number; title: string; regions: string[]; url: string }[] }>(

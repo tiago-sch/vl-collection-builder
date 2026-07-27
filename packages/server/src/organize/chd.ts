@@ -34,19 +34,35 @@ export interface ChdResult {
 
 let available: boolean | null = null;
 
-/** Is chdman on PATH? Cached — the answer cannot change within a process. */
+/**
+ * Is chdman on PATH? Cached — the answer cannot change within a process.
+ *
+ * Exit status is NOT a usable signal here. chdman 0.251 exits 1 for `--version`,
+ * for `help`, and for a bare invocation, while still printing its banner:
+ *
+ *     chdman - MAME Compressed Hunks of Data (CHD) manager 0.251
+ *     Usage: ...
+ *
+ * Probing on exit code alone reports "not installed" for a perfectly good
+ * binary, which silently disables CHD conversion — the feature that halves the
+ * size of a disc library. So we look at the output instead, and only treat
+ * "the command could not be run at all" as unavailable.
+ */
 export async function chdmanAvailable(): Promise<boolean> {
   if (available !== null) return available;
+
+  const looksLikeChdman = (text: string): boolean => /chdman|compressed hunks/i.test(text);
+
   try {
-    await run('chdman', ['--version'], { timeout: 10_000 });
-    available = true;
-  } catch {
-    try {
-      // Older builds exit non-zero for --version but still respond to help.
-      await run('chdman', ['help'], { timeout: 10_000 });
-      available = true;
-    } catch {
+    const { stdout, stderr } = await run('chdman', ['--version'], { timeout: 10_000 });
+    available = looksLikeChdman(`${stdout}${stderr}`);
+  } catch (err) {
+    const e = err as { stdout?: string; stderr?: string; code?: string };
+    if (e.code === 'ENOENT') {
       available = false;
+    } else {
+      // Ran, but exited non-zero: judge it by what it printed.
+      available = looksLikeChdman(`${e.stdout ?? ''}${e.stderr ?? ''}`);
     }
   }
   return available;

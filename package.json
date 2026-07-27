@@ -20,7 +20,8 @@
     "start": "node packages/server/dist/index.js",
     "test": "vitest run",
     "test:watch": "vitest",
-    "typecheck": "tsc -b --pretty && tsc -p packages/web/tsconfig.json --noEmit"
+    "typecheck": "tsc -b --pretty && tsc -p packages/web/tsconfig.json --noEmit",
+    "eval": "node packages/server/dist/scripts/eval.js"
   },
   "devDependencies": {
     "@types/node": "^22.10.2",

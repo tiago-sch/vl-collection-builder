@@ -14,6 +14,9 @@ export function Settings() {
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [syncing, setSyncing] = useState<Record<string, string>>({});
+  const [library, setLibrary] = useState<Awaited<ReturnType<typeof api.libraryStatus>> | null>(null);
+  const [template, setTemplate] = useState('');
+  const [preview, setPreview] = useState<{ rendered: string }[]>([]);
 
   const refresh = (): void => {
     void api.settings().then((r) => {
@@ -25,9 +28,26 @@ export function Settings() {
       setHealth(r.health);
     });
     void api.aliases().then((r) => setAliases(r.aliases));
+    void api.libraryStatus().then((r) => {
+      setLibrary(r);
+      setTemplate((t) => t || r.namingTemplate);
+    });
   };
 
   useEffect(refresh, []);
+
+  // Live preview, so you can see what a template change does before applying it
+  // to 400 games (plan §9.7).
+  useEffect(() => {
+    if (!template) return;
+    const t = setTimeout(() => {
+      void api
+        .namingPreview(template)
+        .then((r) => setPreview(r.examples))
+        .catch(() => setPreview([]));
+    }, 250);
+    return () => clearTimeout(t);
+  }, [template]);
 
   const save = async (patch: Partial<AppSettings>): Promise<void> => {
     try {
@@ -193,6 +213,86 @@ export function Settings() {
           </select>
         </div>
       </div>
+
+      {library && (
+        <div className="panel">
+          <h2>Library &amp; organizing</h2>
+
+          {!library.enabled && (
+            <div className="banner warn">
+              Organizing is off (ORGANIZE_ENABLED=false) — downloads stop at the staging
+              directory.
+            </div>
+          )}
+          {library.folderMapWarnings.map((w) => (
+            <div className="banner warn" key={w}>
+              {w}
+            </div>
+          ))}
+          {!library.chdmanAvailable && library.chdPolicy !== 'never' && (
+            <div className="banner warn">
+              chdman is not available in this image, so CHD conversion will be skipped and disc
+              images stay in their extracted layout.
+            </div>
+          )}
+
+          <div className="row muted" style={{ fontSize: 13, marginBottom: 14 }}>
+            <span>
+              Library <code>{library.libraryPath}</code>
+            </span>
+            <span>·</span>
+            <span>
+              Work <code>{library.workPath}</code>
+            </span>
+            <span>·</span>
+            <span>extract: {library.extractPolicy}</span>
+            <span>·</span>
+            <span>chd: {library.chdPolicy}</span>
+            <span>·</span>
+            <span>folders: {library.platformFolderStyle}</span>
+          </div>
+
+          <label className="field">
+            <span>Naming template</span>
+            <input
+              type="text"
+              value={template}
+              onChange={(e) => setTemplate(e.target.value)}
+              spellCheck={false}
+            />
+            <span style={{ textTransform: 'none', letterSpacing: 0, marginTop: 5, fontSize: 12 }}>
+              Tokens: {'{title} {region} {version} {platform} {vaultId} {disc}'}. Set via
+              NAMING_TEMPLATE — this preview is read-only.
+            </span>
+          </label>
+
+          {preview.length > 0 && (
+            <div>
+              <strong style={{ fontSize: 12 }}>Preview</strong>
+              <ul style={{ margin: '6px 0 0', paddingLeft: 18 }}>
+                {preview.map((e, i) => (
+                  <li key={i} className="muted" style={{ fontSize: 13 }}>
+                    <code>{e.rendered}</code>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+
+          <details style={{ marginTop: 14 }}>
+            <summary className="muted" style={{ cursor: 'pointer', fontSize: 13 }}>
+              Platform folder names ({library.platformFolderStyle})
+            </summary>
+            <div className="row" style={{ marginTop: 8, fontSize: 12 }}>
+              {library.folders.map((f) => (
+                <span key={f.slug} className="badge">
+                  {f.slug} → {f.folder}
+                </span>
+              ))}
+            </div>
+          </details>
+        </div>
+      )}
 
       <div className="panel">
         <h2>Learned aliases</h2>

@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { TIER_LABELS, type Game, type ResolvedTier } from '@vault-lookup/shared';
+import { TIER_LABELS, type Game, type LibraryFile, type ResolvedTier } from '@vault-lookup/shared';
 import { api } from '../api/client.js';
 
 export function Library() {
@@ -9,6 +9,8 @@ export function Library() {
   const [error, setError] = useState<string | null>(null);
   const [selected, setSelected] = useState<Set<number>>(new Set());
   const [notice, setNotice] = useState<string | null>(null);
+  const [files, setFiles] = useState<LibraryFile[]>([]);
+  const [expanded, setExpanded] = useState<number | null>(null);
 
   const load = (): void => {
     void api
@@ -18,6 +20,14 @@ export function Library() {
   };
 
   useEffect(load, []);
+  useEffect(() => {
+    void api
+      .libraryFiles()
+      .then((r) => setFiles(r.files))
+      .catch(() => setFiles([]));
+  }, []);
+
+  const filesFor = (gameId: number): LibraryFile[] => files.filter((f) => f.gameId === gameId);
 
   const platforms = useMemo(() => [...new Set(games.map((g) => g.platform))].sort(), [games]);
 
@@ -134,6 +144,7 @@ export function Library() {
               <th style={{ width: 90 }}>Region</th>
               <th style={{ width: 70 }}>Version</th>
               <th style={{ width: 80 }}>Matched</th>
+              <th style={{ width: 80 }}>Files</th>
               <th style={{ width: 100 }}>Vault</th>
               <th style={{ width: 40 }} />
             </tr>
@@ -171,6 +182,20 @@ export function Library() {
                   )}
                 </td>
                 <td>
+                  {filesFor(g.id).length > 0 ? (
+                    <button
+                      onClick={() => setExpanded(expanded === g.id ? null : g.id)}
+                      style={{ padding: '2px 8px', fontSize: 12 }}
+                    >
+                      {filesFor(g.id).length} {expanded === g.id ? '▾' : '▸'}
+                    </button>
+                  ) : (
+                    <span className="badge" title="Nothing organized on disk for this game">
+                      none
+                    </span>
+                  )}
+                </td>
+                <td>
                   <a href={g.vaultUrl} target="_blank" rel="noreferrer">
                     {g.vaultId ? `vault/${g.vaultId}` : 'link'}
                   </a>
@@ -181,10 +206,30 @@ export function Library() {
                   </button>
                 </td>
               </tr>
-            ))}
+            )).flatMap((row, i) => {
+              const g = shown[i]!;
+              if (expanded !== g.id) return [row];
+              return [
+                row,
+                <tr key={`${g.id}-files`}>
+                  <td colSpan={9} style={{ background: 'var(--panel-2)' }}>
+                    <strong style={{ fontSize: 12 }}>On disk</strong>
+                    <ul style={{ margin: '6px 0 0', paddingLeft: 18 }}>
+                      {filesFor(g.id).map((f) => (
+                        <li key={f.id} className="muted" style={{ fontSize: 12 }}>
+                          <code>{f.relPath}</code>
+                          {f.bytes !== null && ` — ${(f.bytes / (1024 * 1024)).toFixed(1)} MB`}
+                          {f.kind && ` (${f.kind})`}
+                        </li>
+                      ))}
+                    </ul>
+                  </td>
+                </tr>,
+              ];
+            })}
             {shown.length === 0 && (
               <tr>
-                <td colSpan={8} className="muted" style={{ padding: 20, textAlign: 'center' }}>
+                <td colSpan={9} className="muted" style={{ padding: 20, textAlign: 'center' }}>
                   {games.length === 0
                     ? 'Nothing saved yet — run an import.'
                     : 'No games match that filter.'}
