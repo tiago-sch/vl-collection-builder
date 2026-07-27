@@ -63,6 +63,13 @@ export interface ParseResult {
    * The UI surfaces this — a review queue without regions is much harder to use.
    */
   columnsMissing: boolean;
+  /**
+   * Listings are paginated at 200 rows. Missing this is silent data loss: the
+   * catalogue looks populated while holding only the first page of each letter.
+   */
+  hasNextPage: boolean;
+  /** Honeypot anchors skipped. Non-zero is expected and healthy — see parser.ts. */
+  decoysSkipped: number;
   warnings: string[];
 }
 
