@@ -28,7 +28,6 @@ export async function setupRoutes(app: FastifyInstance): Promise<void> {
       platform?: string;
       regionPreference?: string[];
       strictRegion?: boolean;
-      resolver?: string | null;
     };
   }>('/setup/complete', async (req, reply) => {
     const body = req.body ?? {};
@@ -44,7 +43,6 @@ export async function setupRoutes(app: FastifyInstance): Promise<void> {
     updateSettings({
       regionPreference: body.regionPreference,
       strictRegion: body.strictRegion ?? false,
-      resolverProvider: body.resolver ?? null,
     });
     markSetupComplete();
 

@@ -1,5 +1,5 @@
 -- Phases 1-7: catalogue mirror, matching, jobs and the saved library.
--- Download and organizer tables arrive in phases 9-10 as later migrations.
+-- Download and organizer tables arrive in phases 8-9 as later migrations.
 
 -- ---------------------------------------------------------------------------
 -- Mirror of the remote catalogue
@@ -66,7 +66,8 @@ CREATE TABLE job (
   name              TEXT,
   region_preference TEXT,                   -- JSON array; null = global default
   strict_region     INTEGER NOT NULL DEFAULT 0,
-  resolver_used     TEXT,
+  resolver_used     TEXT,                  -- dropped by 003; kept so the
+                                          --   migration chain stays valid
   created_at        TEXT NOT NULL,
   status            TEXT NOT NULL           -- resolving | needs_review | complete
 );
@@ -79,7 +80,7 @@ CREATE TABLE job_item (
   input_name    TEXT    NOT NULL,
   input_norm    TEXT    NOT NULL,
   status        TEXT    NOT NULL,
-  resolved_tier INTEGER,                    -- 0 alias|1 exact|2 fuzzy|3 llm|4 human
+  resolved_tier INTEGER,                    -- renumbered by 003
   chosen_entry  INTEGER REFERENCES catalog_entry(id) ON DELETE SET NULL,
   manual_url    TEXT,
   confidence    REAL,
@@ -95,7 +96,7 @@ CREATE TABLE match_candidate (
   score       REAL    NOT NULL,             -- after region bonus
   base_score  REAL    NOT NULL,             -- before region bonus, for debugging
   rank        INTEGER NOT NULL,
-  llm_note    TEXT
+  llm_note    TEXT                          -- dropped by 003
 );
 CREATE INDEX idx_candidate_item ON match_candidate (job_item_id, rank);
 
@@ -119,14 +120,14 @@ CREATE TABLE game (
 CREATE INDEX idx_game_platform ON game (platform, name);
 
 -- Every review confirmation is ground truth. Storing it makes the tool need the
--- expensive tiers less over time, and doubles as the eval set (plan §4.3, §4.5).
+-- expensive tiers less over time, and doubles as the eval set (plan §4.3, §4.4).
 CREATE TABLE learned_alias (
   id           INTEGER PRIMARY KEY,
   platform     TEXT    NOT NULL,
   input_norm   TEXT    NOT NULL,
   entry_id     INTEGER NOT NULL REFERENCES catalog_entry(id) ON DELETE CASCADE,
   vault_id     INTEGER NOT NULL,            -- survives a catalogue re-sync
-  source       TEXT    NOT NULL,            -- user | static | llm
+  source       TEXT    NOT NULL,            -- user | static
   confirmed_at TEXT    NOT NULL,
   UNIQUE (platform, input_norm)
 );

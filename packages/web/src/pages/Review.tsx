@@ -134,7 +134,7 @@ export function Review({ jobId, onDone }: { jobId: number; onDone: () => void })
             <TierCount counts={counts} tier={0} label="alias" />
             <TierCount counts={counts} tier={1} label="exact" />
             <TierCount counts={counts} tier={2} label="fuzzy" />
-            <TierCount counts={counts} tier={4} label="you" />
+            <TierCount counts={counts} tier={3} label="you" />
             <div style={{ flex: 1 }} />
             <button
               className="primary"
@@ -223,7 +223,7 @@ export function Review({ jobId, onDone }: { jobId: number; onDone: () => void })
   );
 }
 
-function TierCount({ counts, tier, label }: { counts: JobCounts; tier: 0 | 1 | 2 | 4; label: string }) {
+function TierCount({ counts, tier, label }: { counts: JobCounts; tier: 0 | 1 | 2 | 3; label: string }) {
   const n = counts.byTier[tier] ?? 0;
   return (
     <span className={`badge tier${tier}`}>

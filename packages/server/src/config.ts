@@ -67,11 +67,6 @@ export const config = {
   regionPreference: regionList('REGION_PREFERENCE'),
   setupSkip: bool('SETUP_SKIP', false),
 
-  // --- resolver (phase 8; absent key means tier 3 never runs) ---
-  resolver: str('RESOLVER', ''),
-  resolverModel: str('RESOLVER_MODEL', ''),
-  resolverMaxItems: int('RESOLVER_MAX_ITEMS', 50),
-
   // --- downloads (plan §8) ---
   downloadsPath: resolve(str('DOWNLOADS_PATH', './downloads')),
   /**
@@ -136,7 +131,6 @@ export const settingDefaults = {
   max_candidates: '8',
   stale_after_days: '30',
   crawl_delay_ms: String(config.crawlDelayMs),
-  resolver_provider: config.resolver,
 } as const;
 
 export type SettingKey = keyof typeof settingDefaults | 'setup_completed_at';

@@ -1,15 +1,14 @@
 /**
- * Matching evaluation (plan §4.5).
+ * Matching evaluation (plan §4.4).
  *
  * `learned_alias` accumulates human-confirmed input -> entry pairs as an
  * ordinary side effect of using the review queue. That is a real labelled set,
  * produced for free, and it is what makes "is this tier earning its place?" an
  * answerable question rather than a matter of taste.
  *
- * Most "should I add AI here?" decisions never get an answer because nobody has
- * ground truth. This design generates it. When the phase 8 resolver lands, the
- * same harness replays the set with it on and off; if the delta is two
- * percentage points, turn it off and save the key.
+ * It answers "is the matcher actually getting better?" with data rather than
+ * impressions, and it is the honest way to judge any change to normalisation,
+ * scoring or the alias table: make the change, re-run, compare.
  *
  *   npm run eval
  *   npm run eval -- --platform ps2 --verbose
@@ -137,7 +136,7 @@ async function main(): Promise<void> {
   }
   console.log('\nBy tier:');
   for (const [tier, n] of [...byTier].sort()) {
-    const names: Record<string, string> = { '0': 'alias', '1': 'exact', '2': 'fuzzy', '3': 'llm' };
+    const names: Record<string, string> = { '0': 'alias', '1': 'exact', '2': 'fuzzy', '3': 'you' };
     console.log(`  tier ${tier} (${names[tier] ?? '?'}) : ${n}`);
   }
 
@@ -160,8 +159,8 @@ async function main(): Promise<void> {
   }
 
   console.log(
-    '\nThe resolver is not built (phase 8). When it is, run this with it on and\n' +
-      'off: if auto-resolution moves by a couple of points, it is not worth a key.\n',
+    '\nRe-run this after changing normalisation, scoring or the alias table to see\n' +
+      'whether the change actually helped.\n',
   );
 
   closeDb();

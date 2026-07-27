@@ -6,8 +6,8 @@ keyboard-driven review queue. Confirmed results are saved locally, exportable as
 JSON or CSV, and can optionally be downloaded and organized into an
 emulator-ready library.
 
-Self-hosted, single container, single port, no external services. An LLM is
-optional and is not currently implemented.
+Self-hosted, single container, single port, no external services. No API keys,
+no cloud, nothing to sign up for.
 
 The review queue, with a real ambiguous case — nine names in, eight resolved
 automatically, one worth your attention:
@@ -74,8 +74,7 @@ not settle:
 | 0 | Learned or static alias | free, instant |
 | 1 | Exact match after normalisation | free, instant |
 | 2 | Fuzzy score above the threshold **with a margin** | free, instant |
-| 3 | Optional LLM | **not built** — see below |
-| 4 | You | your attention |
+| 3 | You | your attention |
 
 **The margin rule is what makes this safe.** Two regional variants of one game
 both score ~0.99, so the gap between them is ~0, so tier 2 refuses to
@@ -86,7 +85,8 @@ would not notice for fifty games.
 **Every confirmation is remembered.** Confirming `dragon quest viii` writes a
 learned alias, so the same input resolves instantly next time. The tool needs
 your attention less the more you use it — and the accumulated pairs are a real
-labelled set, which `npm run eval` replays to measure match quality.
+labelled set, which `npm run eval` replays to measure whether a change to
+matching actually helped.
 
 ### Region is a policy, not a guess
 
@@ -258,20 +258,6 @@ serial](#why-downloads-are-serial).
 | `CHD_POLICY` | `disc-only` | `disc-only` \| `never`. |
 | `CHD_KEEP_SOURCE` | `false` | True keeps the extracted `.bin`/`.cue` alongside the `.chd`. |
 | `ORGANIZE_MIN_FREE_DISK_MB` | `4096` | Extraction needs archive + extracted size at once; disc images roughly double. |
-
-### Resolver (not implemented)
-
-| Variable | Default | Notes |
-|---|---|---|
-| `RESOLVER` | *(empty)* | `gemini` \| `openai` \| `ollama` |
-| `GEMINI_API_KEY` | *(empty)* | Absent means tier 3 is skipped and more items reach review. Nothing else changes. |
-| `RESOLVER_MODEL` | *(empty)* | |
-| `RESOLVER_MAX_ITEMS` | `50` | Hard cap per import, as a cost guard. |
-
-Phase 8 of the plan is **not built**. Tier 3 is skipped, which is exactly the
-path taken when no key is configured — nothing is stubbed or faked. Before adding
-it, run `npm run eval`: on a 15-title sample, 12 resolved automatically with no
-AI at all, and two of the three misses were games that are not on the platform.
 
 ## Deployment
 
@@ -475,7 +461,7 @@ rather than hammering a failing server.
 See [docs/development.md](docs/development.md).
 
 ```bash
-npm test          # 130 tests, no network required
+npm test          # 134 tests, no network required
 npm run typecheck
 npm run eval      # measure match quality against your own confirmations
 ```

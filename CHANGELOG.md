@@ -11,9 +11,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - **Name resolution.** Paste a list of game names, get Vault URLs. The whole
   platform catalogue is mirrored locally, then matched against in memory.
-- **Five-tier matching cascade** — learned alias, exact, fuzzy with a margin
-  rule, LLM (not built), human review. Each tier only sees what the tier above
-  could not settle.
+- **Four-tier matching cascade** — learned alias, exact, fuzzy with a margin
+  rule, then you. Each tier only sees what the tier above could not settle, and
+  every tier is local: no API keys, no network calls beyond the source site.
 - **Region as policy.** An ordered preference list applied deterministically,
   with a bonus mathematically capped below the tier-2 margin so it breaks ties
   but never promotes a worse title match. Settable globally, per import and per
@@ -46,7 +46,3 @@ Behaviour discovered while building, all of which fails *silently* if ignored:
   the first.
 - The download host rejects non-browser User-Agents with `400`.
 
-### Not included
-
-- The optional LLM resolver (phase 8 of the plan). Tier 3 is skipped, which is
-  the same path taken when no API key is set.

@@ -18,7 +18,6 @@ interface CreateBody {
   name?: string;
   regionPreference?: string[];
   strictRegion?: boolean;
-  useResolver?: boolean;
 }
 
 export async function jobRoutes(app: FastifyInstance): Promise<void> {
@@ -49,7 +48,6 @@ export async function jobRoutes(app: FastifyInstance): Promise<void> {
         name: body.name ?? null,
         regionPreference: body.regionPreference ?? null,
         strictRegion: body.strictRegion ?? null,
-        useResolver: body.useResolver ?? false,
       });
       return { job, counts: getCounts(job.id) };
     } catch (err) {

@@ -17,7 +17,7 @@ export interface Platform {
   system: string;
   /** Human label for the UI: 'PlayStation 2'. */
   label: string;
-  /** Disc-based systems need extraction and CHD conversion (phases 9-10). */
+  /** Disc-based systems need extraction and CHD conversion (phases 8-9). */
   discBased: boolean;
 }
 
@@ -114,16 +114,15 @@ export type JobItemStatus =
 
 /**
  * How an item was resolved.
- * 0 alias · 1 exact · 2 fuzzy · 3 llm · 4 human
+ * 0 alias · 1 exact · 2 fuzzy · 3 human
  */
-export type ResolvedTier = 0 | 1 | 2 | 3 | 4;
+export type ResolvedTier = 0 | 1 | 2 | 3;
 
 export const TIER_LABELS: Record<ResolvedTier, string> = {
   0: 'alias',
   1: 'exact',
   2: 'fuzzy',
-  3: 'ai',
-  4: 'manual',
+  3: 'manual',
 };
 
 export interface Job {
@@ -132,7 +131,6 @@ export interface Job {
   name: string | null;
   regionPreference: string[] | null;
   strictRegion: boolean;
-  resolverUsed: string | null;
   createdAt: string;
   status: JobStatus;
 }
@@ -149,7 +147,7 @@ export interface JobCounts {
  */
 export type LibraryState =
   | 'none'
-  /** In `game`. In phases 9-10 this splits by whether the file is on disk. */
+  /** In `game`. Once the organizer has run this reflects what is on disk. */
   | 'in_library';
 
 export interface Candidate {
@@ -167,7 +165,6 @@ export interface Candidate {
   /** Score before the region bonus — kept for debugging threshold behaviour. */
   baseScore: number;
   rank: number;
-  llmNote: string | null;
   libraryState: LibraryState;
 }
 
@@ -215,7 +212,7 @@ export interface LearnedAlias {
   inputNorm: string;
   entryId: number;
   vaultId: number;
-  source: 'user' | 'static' | 'llm';
+  source: 'user' | 'static';
   confirmedAt: string;
   /** Joined for display in Settings. */
   title?: string;
@@ -238,7 +235,6 @@ export interface AppSettings {
   maxCandidates: number;
   crawlDelayMs: number;
   staleAfterDays: number;
-  resolverProvider: string | null;
   setupCompletedAt: string | null;
 }
 

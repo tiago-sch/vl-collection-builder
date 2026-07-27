@@ -4,8 +4,7 @@
  *   0  learned or static alias        free, instant
  *   1  exact normalised match         free, instant
  *   2  fuzzy >= threshold with margin free, instant
- *   3  LLM resolver                   optional; not built in this phase
- *   4  human review                   your attention
+ *   3  human review                   your attention
  *
  * Each tier only sees what the tier above could not settle. The margin rule in
  * tier 2 is what makes this behave: two regional variants of one game both score
@@ -239,10 +238,9 @@ export async function resolveItem(input: string, ctx: ResolveContext): Promise<R
     }
   }
 
-  // --- tiers 3 and 4 -------------------------------------------------------
-  // Tier 3 (the optional LLM resolver) is phase 8. Until it exists, anything
-  // unresolved goes straight to the human queue — which is the documented
-  // behaviour when no API key is configured, so this is not a stub so much as
-  // the no-key path.
+  // --- tier 3: you ---------------------------------------------------------
+  // Everything the free tiers could not settle goes to the review queue, where
+  // confirming it writes a learned alias so the same input never needs asking
+  // about twice.
   return { status: 'needs_review', tier: null, chosen: null, confidence: top.score, candidates };
 }

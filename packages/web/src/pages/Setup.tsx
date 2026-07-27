@@ -8,8 +8,8 @@ import { RegionPicker } from '../components/RegionPicker.js';
  *
  * Step 2 has no skip and no pre-selected default beyond REGION_PREFERENCE.
  * Silently defaulting to USA and quietly mismatching a Japan-focused collection
- * is the failure this screen exists to prevent, so `Next` stays disabled until a
- * region is chosen.
+ * is the failure this screen exists to prevent, so `Finish` stays disabled until
+ * a region is chosen.
  */
 export function Setup({ onDone }: { onDone: () => void }) {
   const [step, setStep] = useState(1);
@@ -73,11 +73,11 @@ export function Setup({ onDone }: { onDone: () => void }) {
     <div className="app" style={{ maxWidth: 620 }}>
       <div style={{ padding: '32px 0 20px' }}>
         <h1>VL Collection Builder — first run</h1>
-        <p className="sub">Three steps. Everything here can be changed later in Settings.</p>
+        <p className="sub">Two steps. Everything here can be changed later in Settings.</p>
       </div>
 
       <div className="steps">
-        {[1, 2, 3].map((n) => (
+        {[1, 2].map((n) => (
           <div key={n} className={n <= step ? 'done' : ''} />
         ))}
       </div>
@@ -86,7 +86,7 @@ export function Setup({ onDone }: { onDone: () => void }) {
 
       {step === 1 && (
         <div className="panel">
-          <h2>Step 1 of 3 — Pick a platform</h2>
+          <h2>Step 1 of 2 — Pick a platform</h2>
           <p className="muted">
             Its catalogue is mirrored locally so matching runs against a full copy instead of
             hitting the site once per game. This takes a few minutes and continues in the
@@ -124,7 +124,7 @@ export function Setup({ onDone }: { onDone: () => void }) {
 
       {step === 2 && (
         <div className="panel">
-          <h2>Step 2 of 3 — Which regions do you prefer?</h2>
+          <h2>Step 2 of 2 — Which regions do you prefer?</h2>
           <p className="muted">
             Ranked, highest first. When the same game exists in several regions, matching prefers
             the highest entry — and it will never pick a worse title match just to satisfy a region.
@@ -139,35 +139,16 @@ export function Setup({ onDone }: { onDone: () => void }) {
           </div>
           <div className="row" style={{ marginTop: 18 }}>
             <button onClick={() => setStep(1)}>Back</button>
-            <button className="primary" disabled={regions.length === 0} onClick={() => setStep(3)}>
-              Next
+            <button
+              className="primary"
+              disabled={regions.length === 0}
+              onClick={() => void finish()}
+            >
+              Finish setup
             </button>
             {regions.length === 0 && (
               <span className="muted">Pick at least one region — there is no default.</span>
             )}
-          </div>
-        </div>
-      )}
-
-      {step === 3 && (
-        <div className="panel">
-          <h2>Step 3 of 3 — Optional AI assist</h2>
-          <p className="muted">
-            VL Collection Builder works fully without this. With an API key configured, titles that local
-            matching cannot settle get one batched call before they reach your review queue. The
-            model only ever proposes search strings or picks from candidates found locally — it
-            never produces a URL or an ID.
-          </p>
-          <div className="banner info" style={{ marginTop: 12 }}>
-            Not built yet — this arrives in phase 8. Set <code>GEMINI_API_KEY</code> then; until
-            it exists, unresolved titles go straight to review, which is also what happens whenever
-            no key is set.
-          </div>
-          <div className="row" style={{ marginTop: 16 }}>
-            <button onClick={() => setStep(2)}>Back</button>
-            <button className="primary" onClick={() => void finish()}>
-              Finish setup
-            </button>
           </div>
         </div>
       )}

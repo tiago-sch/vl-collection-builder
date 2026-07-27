@@ -2,7 +2,7 @@
 
 A self-hosted web app: paste a list of game names, pick a platform, and it resolves each title to its Vimm's Lair Vault page URL. Ambiguous matches are confirmed by you in the UI. Confirmed results are stored in a local SQLite database.
 
-**Stack:** Node.js + TypeScript · Fastify · `node:sqlite` · React + Vite · Docker (single image, single port) · optional Gemini resolver
+**Stack:** Node.js + TypeScript · Fastify · `node:sqlite` · React + Vite · Docker (single image, single port)
 **Scope of this document:** plan only — no code written yet.
 **Built on:** [gamarr](https://github.com/JeremiahM37/gamarr) (indexer, platform registry, health model) and [vl-downloader](https://github.com/Raiper34/vl-downloader) (download queue) — full credits in §14.
 
@@ -128,11 +128,6 @@ vl-collection-builder/
 │   │   │   │   ├── region.ts     # preference list → bonus + strict filter
 │   │   │   │   ├── aliases.ts    # static + learned alias lookup
 │   │   │   │   └── resolve.ts    # tier cascade + status decision
-│   │   │   ├── resolver/         # optional LLM tier — absent key = no-op
-│   │   │   │   ├── types.ts      # Resolver interface
-│   │   │   │   ├── gemini.ts
-│   │   │   │   ├── ollama.ts
-│   │   │   │   └── cache.ts
 │   │   │   ├── jobs/service.ts
 │   │   │   ├── download/
 │   │   │   │   ├── vimm.ts       # vault page → form action + mediaId + Referer
@@ -140,7 +135,7 @@ vl-collection-builder/
 │   │   │   │   └── queue.ts      # SQLite-backed queue ops, reorder, recovery
 │   │   │   └── routes/           # catalog.ts, jobs.ts, games.ts, downloads.ts, settings.ts, export.ts
 │   │   ├── data/aliases.json     # static alias table, hand-reviewed
-│   │   ├── scripts/eval.ts       # replay learned_alias, resolver on vs off
+│   │   ├── scripts/eval.ts       # replay learned_alias through the matcher
 │   │   └── test/fixtures/        # saved listing HTML for parser tests
 │   └── web/
 │       └── src/
@@ -177,7 +172,7 @@ CREATE INDEX idx_catalog_norm ON catalog_entry (platform, title_norm);
 -- Global config, single row keyed by name
 CREATE TABLE settings (
   key        TEXT PRIMARY KEY,           -- region_preference, strict_region,
-  value      TEXT NOT NULL,              --   thresholds, resolver_provider…
+  value      TEXT NOT NULL,              --   thresholds, crawl delay…
   updated_at TEXT NOT NULL
 );
 -- setup_completed_at absent → first-run wizard is forced (§6.0)
@@ -196,7 +191,6 @@ CREATE TABLE job (
   platform          TEXT NOT NULL,
   name              TEXT,
   region_preference TEXT,                -- JSON array; null = use global default
-  resolver_used     TEXT,                -- null | 'gemini' | 'ollama' …
   created_at        TEXT NOT NULL,
   status            TEXT NOT NULL        -- resolving | needs_review | complete
 );
@@ -208,7 +202,7 @@ CREATE TABLE job_item (
   position      INTEGER NOT NULL,        -- preserves input order
   input_name    TEXT    NOT NULL,
   status        TEXT    NOT NULL,        -- pending|auto_matched|needs_review|confirmed|not_found|skipped
-  resolved_tier INTEGER,                 -- 0 alias | 1 exact | 2 fuzzy | 3 llm | 4 human
+  resolved_tier INTEGER,                 -- 0 alias | 1 exact | 2 fuzzy | 3 human
   chosen_entry  INTEGER REFERENCES catalog_entry(id),
   manual_url    TEXT,                    -- escape hatch: paste a URL yourself
   confidence    REAL,
@@ -222,8 +216,7 @@ CREATE TABLE match_candidate (
   entry_id     INTEGER NOT NULL REFERENCES catalog_entry(id),
   score        REAL NOT NULL,            -- after region bonus
   base_score   REAL NOT NULL,            -- before region bonus, for debugging
-  rank         INTEGER NOT NULL,
-  llm_note     TEXT                      -- one-line justification if tier 3 ranked it
+  rank         INTEGER NOT NULL
 );
 
 -- The deliverable: the saved list
@@ -282,16 +275,15 @@ Matching runs as a cascade. Each tier only sees what the tier above couldn't set
 | 0 | Learned alias hit (§4.3) | grows over time | free, instant |
 | 1 | Exact `title_norm` match | ~70% | free, instant |
 | 2 | Fuzzy score ≥ 0.95 with margin ≥ 0.08 | ~15% | free, instant |
-| 3 | **LLM resolver** (§4.4) — optional | ~10–15% | one batched API call |
-| 4 | Human review queue | whatever's left | your attention |
+| 3 | Human review queue | whatever's left | your attention |
 
 Thresholds live in `config.ts` and are tunable from Settings. The margin rule in tier 2 is what makes this behave sensibly: two regional variants of the same game both score ~0.99, so the margin is ~0, so it declines to auto-accept and passes the item down.
 
-**Live-search fallback:** for items that reach tier 4 as `not_found`, offer a one-click live site search (`&q=…`) — covers titles absent from the mirror because it went stale.
+**Live-search fallback:** for items that reach tier 3 as `not_found`, offer a one-click live site search (`&q=…`) — covers titles absent from the mirror because it went stale.
 
 ### 4.2 Region handling
 
-Region is a **policy**, not a guess — so it is never delegated to fuzzy scoring or to the LLM. It's an ordered preference list, applied deterministically.
+Region is a **policy**, not a guess — so it is never delegated to fuzzy scoring. It's an ordered preference list, applied deterministically.
 
 ```
 regionPreference: ["USA", "Europe", "Japan", "Australia", "Korea", "Asia"]
@@ -338,51 +330,19 @@ CREATE TABLE learned_alias (
   input_norm   TEXT NOT NULL,
   entry_id     INTEGER NOT NULL REFERENCES catalog_entry(id),
   vault_id     INTEGER NOT NULL,   -- survives catalogue re-sync
-  source       TEXT NOT NULL,      -- user | static | llm
+  source       TEXT NOT NULL,      -- user | static
   confirmed_at TEXT NOT NULL,
   UNIQUE (platform, input_norm)
 );
 ```
 
-The effect compounds: the tool needs the LLM less every time you use it, and after a few imports your own vocabulary is covered better than any generic alias list could. This table is also the evaluation set — see §4.5.
+The effect compounds: the tool asks you less every time you use it, and after a few imports your own vocabulary is covered better than any generic alias list could. This table is also the evaluation set — see §4.4.
 
-### 4.4 Optional LLM resolver (Gemini)
+### 4.4 Measuring match quality
 
-**Enabled only when `GEMINI_API_KEY` is set.** Absent, everything works; more items simply reach the review queue. This must never become a hard dependency for a self-hosted tool.
+`learned_alias` accumulates human-confirmed pairs — a real labelled set, produced as a side effect of ordinary use. A `npm run eval` script replays it through the matcher, with each item's own alias removed so it measures how matching behaved the *first* time, and reports resolution rate, wrong-match rate and a tier breakdown.
 
-Tier 3 runs two passes, both of which produce output that is **validated against the local mirror before it can touch the database**:
-
-**Pass A — alias expansion.** Send the unresolved input names (batched, all in one request) and ask for known alternate titles: regional renames, romanizations, expanded abbreviations. The model returns *strings only*. Each string is re-run through the normal local matcher. If a returned alias matches nothing in the catalogue, nothing happens.
-
-**Pass B — constrained re-ranking.** For items still ambiguous, send the input plus the top 8 local candidates including region and version, and ask for a selection **by index** with a one-line justification. Any response whose index is outside the supplied set is rejected outright.
-
-**The non-negotiable constraint:** the model never emits a URL, a vault ID, or a title that becomes a stored value. It proposes search strings, or it picks from a list you gave it. A model will happily invent `vimm.net/vault/8891` for a game that does not exist, and it will look entirely plausible in your database. This architecture makes that structurally impossible rather than merely unlikely.
-
-Implementation notes:
-
-- Gemini's [structured output](https://ai.google.dev/gemini-api/docs/structured-output) enforces a response JSON schema — use it; don't parse free text.
-- Flash tier, one or two batched calls per import — cost is a rounding error at this volume ([pricing](https://ai.google.dev/gemini-api/docs/pricing)).
-- Cache by `(platform, input_norm)` in `resolver_cache` with a TTL, so re-running a list costs nothing.
-- Behind a `Resolver` interface (`expandAliases`, `rerank`) with `GeminiResolver`, `OpenAIResolver`, `OllamaResolver` implementations. Self-hosters will want the local option.
-- Log every call to `resolver_call` (input, tier, model, accepted/rejected, latency) so §4.5 has data.
-- Never send the whole catalogue in the prompt — only the input names and the shortlist.
-
-```sql
-CREATE TABLE resolver_cache (
-  platform    TEXT NOT NULL,
-  input_norm  TEXT NOT NULL,
-  response    TEXT NOT NULL,       -- JSON
-  model       TEXT NOT NULL,
-  created_at  TEXT NOT NULL,
-  PRIMARY KEY (platform, input_norm, model)
-);
-```
-
-### 4.5 Measuring whether the LLM earns its place
-
-`learned_alias` accumulates human-confirmed pairs — a real labelled set, produced as a side effect of ordinary use. A `npm run eval` script replays it through the matcher with the resolver on and off and reports resolution rate, wrong-match rate, and cost per import.
-
-Most "should I add AI here?" questions never get an answer because nobody has ground truth. This design generates it for free. If the resolver turns out to add two percentage points, turn it off and save the key.
+That makes "did this change actually help?" an answerable question rather than a matter of taste, for any change to normalisation, scoring or the alias table.
 
 ---
 
@@ -393,7 +353,7 @@ Most "should I add AI here?" questions never get an answer because nobody has gr
 | `GET` | `/api/platforms` | Supported platform slugs |
 | `GET` | `/api/catalog/status` | Per-platform sync state, entry count, age |
 | `POST` | `/api/catalog/sync` | Start/refresh a platform crawl (SSE progress) |
-| `POST` | `/api/jobs` | `{ platform, names[], regionPreference?, useResolver? }` → creates job, runs the tier cascade |
+| `POST` | `/api/jobs` | `{ platform, names[], regionPreference?, strictRegion? }` → creates job, runs the tier cascade |
 | `GET` | `/api/jobs/:id` | Job + counts by status **and by resolved tier** |
 | `GET` | `/api/jobs/:id/items` | Items, filterable by status, with candidates |
 | `POST` | `/api/jobs/:id/items/:itemId/resolve` | `{ entryId }` \| `{ manualUrl }` \| `{ skip: true }` — also writes `learned_alias` |
@@ -401,9 +361,8 @@ Most "should I add AI here?" questions never get an answer because nobody has gr
 | `GET` | `/api/games` | The saved list (`?format=json\|csv`, `?minimal=true`) |
 | `DELETE` | `/api/games/:id` | Remove an entry |
 | `GET` | `/api/setup/state` | `{ completed: bool }` — drives the first-run redirect |
-| `POST` | `/api/setup/complete` | `{ platform, regionPreference[], strictRegion, resolver? }` |
-| `GET`/`PUT` | `/api/settings` | Region preference, thresholds, resolver on/off |
-| `GET` | `/api/resolver/status` | Configured provider, key present, cache hit rate, spend |
+| `POST` | `/api/setup/complete` | `{ platform, regionPreference[], strictRegion }` |
+| `GET`/`PUT` | `/api/settings` | Region preference, thresholds, crawl delay |
 | `GET` | `/api/aliases` | Learned aliases — viewable, deletable when you mis-confirm |
 
 ---
@@ -414,11 +373,11 @@ Four screens plus a one-time wizard, deliberately plain.
 
 ### 6.0 First-run wizard
 
-Forced whenever `settings.setup_completed_at` is absent — every route redirects to it. Three steps, and step 2 has no skip:
+Forced whenever `settings.setup_completed_at` is absent — every route redirects to it. Two steps, and the second has no skip:
 
 ```
 ┌───────────────────────────────────────────────────────────┐
-│  Step 2 of 3 — Which regions do you prefer?               │
+│  Step 2 of 2 — Which regions do you prefer?               │
 │                                                            │
 │  Drag to rank. Matching prefers higher entries when the    │
 │  same game exists in several regions.                      │
@@ -435,9 +394,8 @@ Forced whenever `settings.setup_completed_at` is absent — every route redirect
 └───────────────────────────────────────────────────────────┘
 ```
 
-1. **Pick a platform** and start its first catalogue sync (runs in the background through steps 2–3, so the wait costs nothing)
-2. **Region preference** — the picker above, no default pre-selected beyond what `REGION_PREFERENCE` supplies, `Next` disabled until at least one region is chosen
-3. **Optional resolver** — paste a Gemini key or skip; explicitly labelled *optional*, with a line explaining the tool works fully without it
+1. **Pick a platform** and start its first catalogue sync (runs in the background through step 2, so the wait costs nothing)
+2. **Region preference** — the picker above, no default pre-selected beyond what `REGION_PREFERENCE` supplies, `Finish` disabled until at least one region is chosen
 
 Writes `settings.setup_completed_at` on finish. Everything set here is editable later in Settings; the wizard exists to make sure the choice is *made*, not to lock it in. Re-runnable from Settings.
 
@@ -447,14 +405,13 @@ Writes `settings.setup_completed_at` on finish. Everything set here is editable 
 
 **Import** — platform dropdown, **region picker**, big textarea (one game per line, paste from anywhere), a preview count, and a warning banner if the catalogue for that platform has never been synced or is >30 days old.
 
-The region picker is a drag-to-reorder list pre-filled from your global default, plus a "strict — exclude other regions" checkbox and an AI-assist toggle (shown only when a resolver key is configured):
+The region picker is a drag-to-reorder list pre-filled from your global default, plus a "strict — exclude other regions" checkbox:
 
 ```
 ┌───────────────────────────────────────────────────────────┐
 │  Platform  [ PS2  ▾ ]                                     │
 │  Region preference    ⠿ USA   ⠿ Europe   ⠿ Japan   [+]    │
 │  ☐ Strict — never match outside these regions             │
-│  ☑ Use AI for unresolved titles   (Gemini · ~12 items)    │
 └───────────────────────────────────────────────────────────┘
 ```
 
@@ -463,7 +420,6 @@ The region picker is a drag-to-reorder list pre-filled from your global default,
 ```
 ┌───────────────────────────────────────────────────────────┐
 │  "biohazard 4"                            3 of 11 to review│
-│  ✦ AI: likely the Japanese title for Resident Evil 4       │
 ├───────────────────────────────────────────────────────────┤
 │ ▸ 1  Resident Evil 4        USA    v1.00   0.98   [Enter] │
 │      ⓘ Already in library — added 12 Mar, file on disk    │
@@ -474,7 +430,7 @@ The region picker is a drag-to-reorder list pre-filled from your global default,
 └───────────────────────────────────────────────────────────┘
 ```
 
-Number keys select, Enter confirms, arrows move, `R` overrides region for this one item. AI suggestions are labelled and shown as *advice next to the local candidates* — never as a pre-made decision, and never as a row you can't verify. Confirming writes a `learned_alias`, so "biohazard 4" resolves instantly and for free next time.
+Number keys select, Enter confirms, arrows move, `R` overrides region for this one item. Confirming writes a `learned_alias`, so "biohazard 4" resolves instantly and for free next time.
 
 **Duplicate detection.** Every candidate is checked against `game` and `library_file` by `vault_id` as the queue is built, and annotated inline:
 
@@ -490,7 +446,7 @@ The point is that the badge is attached to the *candidate*, not the item. If you
 
 **Library** — the saved `game` table: searchable, sortable, per-row link out to the Vault page, a tier badge showing how each row was resolved, bulk delete, export JSON/CSV.
 
-**Settings** — catalogue sync per platform, default region preference, matching thresholds, crawl delay, resolver provider + key + cache stats, and a browsable/editable learned-alias list.
+**Settings** — catalogue sync per platform, default region preference, matching thresholds, crawl delay, and a browsable/editable learned-alias list.
 
 ---
 
@@ -519,10 +475,6 @@ services:
       SOURCES_URL: ""         # optional: fetch registry from a URL
       REGION_PREFERENCE: ""   # pre-fills the first-run picker; empty → wizard asks
       SETUP_SKIP: "false"     # true + REGION_PREFERENCE → non-interactive setup
-      RESOLVER: ""            # "" (off) | gemini | openai | ollama
-      GEMINI_API_KEY: ""      # absent → tier 3 skipped entirely
-      RESOLVER_MODEL: ""      # optional pin; defaults to a Flash-tier model
-      RESOLVER_MAX_ITEMS: "50"  # hard cap per import, cost guard
     restart: unless-stopped
 ```
 
@@ -913,14 +865,13 @@ The **Downloads** screen gains an organize column showing the post-processing st
 | 2 | `parser.ts` (table + regex fallback) + fixture tests against saved HTML | Highest-risk unknown; validate before building on it |
 | 3 | `fetcher.ts` + `health.ts` + `sync.ts`, `/api/catalog/*` | Fill the mirror; verify ~11.8k PS2 rows land |
 | 4 | `normalize.ts` + `score.ts` + `region.ts` + unit tests on a hand-built tricky-titles set | Tune thresholds and region bonus against known-hard cases, headless |
-| 5 | Static `aliases.json` + `learned_alias` + tier cascade | Free accuracy first — establishes the baseline the LLM must beat |
+| 5 | Static `aliases.json` + `learned_alias` + tier cascade | Free accuracy first — establishes the matching baseline |
 | 6 | Jobs API + `game` table + export | Full pipeline works via curl |
 | 7 | React UI: first-run wizard → Import (with region picker) → Review → Library | Only now, on a proven backend |
-| 8 | **Optional resolver: `Resolver` interface + `gemini.ts` + cache** | Behind a flag, measured against phase 5's baseline |
-| 9 | **Download queue: `download/vimm.ts` + `worker.ts` + Downloads screen** | Consumes verified links, so it needs everything above to exist first |
-| 10 | **Organizer: extract → rename → `.cue` rewrite → CHD convert → `.m3u` → atomic move** | Separate from downloading, and re-runnable against staging — so it can be iterated on without touching the network |
-| 11 | Settings, SSE progress, `eval.ts`, polish | — |
-| 12 | **Docs: README, `.env.example`, `docs/`, `THIRD_PARTY_LICENSES.md`** | Final pass — but the config table and decision rationales are written *during* each phase, not reconstructed here (§13.6) |
+| 8 | **Download queue: `download/vimm.ts` + `worker.ts` + Downloads screen** | Consumes verified links, so it needs everything above to exist first |
+| 9 | **Organizer: extract → rename → `.cue` rewrite → CHD convert → `.m3u` → atomic move** | Separate from downloading, and re-runnable against staging — so it can be iterated on without touching the network |
+| 10 | Settings, SSE progress, `eval.ts`, polish | — |
+| 11 | **Docs: README, `.env.example`, `docs/`, `THIRD_PARTY_LICENSES.md`** | Final pass — but the config table and decision rationales are written *during* each phase, not reconstructed here (§13.6) |
 
 Phase 4's test set should be written before the scorer: `Final Fantasy X`, `Resident Evil 4`, `Okami`, `Shin Megami Tensei: Nocturne`, `Katamari Damacy`, `Devil May Cry 3` (vanilla vs Special Edition), `Silent Hill 2` (Greatest Hits vs original) — these are where naive matching breaks.
 
@@ -934,10 +885,6 @@ Phase 4's test set should be written before the scorer: `Final Fantasy X`, `Resi
 | Rate limiting / IP block | 1.2s delay, single concurrency, honest User-Agent, circuit breaker (§1.1), resumable sync; browser UA documented as last resort |
 | Catalogue goes stale | `last_synced_at` surfaced in UI; live-search fallback for misses |
 | Regional duplicates picked wrong | Ordered preference list applied deterministically; bonus is smaller than the tier-2 margin, so it breaks ties but never outranks a better title match; per-job and per-item override |
-| **LLM invents a game or a URL** | Structurally prevented: the model emits search strings or an index into a list we supplied. Every output is validated against the local mirror before it can be stored. It never produces a URL or vault ID |
-| **LLM becomes a hard dependency** | Tier 3 is skipped entirely when no key is set; phases 1–7 ship a fully working tool without it |
-| **Runaway API cost** | `RESOLVER_MAX_ITEMS` cap per import, batched requests, response cache keyed on `(platform, input_norm, model)`, spend surfaced in Settings |
-| LLM is quietly useless | `eval.ts` replays the confirmed set with the resolver on and off; if the delta is negligible, turn it off |
 | Large download interrupted | `.part` files + HTTP `Range` resume; `active` rows reset to `queued` on boot, so a crash costs seconds, not gigabytes |
 | Disk fills mid-download | `MIN_FREE_DISK_MB` precheck before each item; queue pauses rather than writing a truncated file |
 | Path traversal via `Content-Disposition` | Filenames sanitized and rejected outright if unsafe, mirroring gamarr's handling |
@@ -1004,7 +951,7 @@ Docs are a shipped artifact, not an afterthought — a self-hosted tool that som
 One table, every variable, four columns: **Variable · Default · Description · Notes**. Rules for it:
 
 - Every variable in `docker-compose.yml` appears here — a setting that exists but isn't documented is a bug report waiting to happen
-- Grouped by concern: paths, catalogue, matching, resolver, downloads, organizing, permissions
+- Grouped by concern: paths, catalogue, matching, downloads, organizing, permissions
 - The "Notes" column carries the non-obvious consequence, not a restatement of the name. `WORK_PATH` gets *"on a NAS, moving this to local disk speeds up CHD conversion but makes the final move a copy instead of a rename"*, not *"the work path"*
 - `.env.example` ships as an executable mirror of this table, with the same comments inline
 
@@ -1016,7 +963,7 @@ Two things need a stated *why*, or they'll be undone by the next person to read 
 
 **Why the database can't live on the NAS.** The failure is silent corruption, not a startup error, so a user moving `DATABASE_PATH` to their share to "keep everything together" is a completely reasonable-looking action with a bad outcome. This gets a callout box in the deployment section, not a footnote.
 
-Same treatment, more briefly, for extract-policy defaulting to `disc-only` and for the LLM never emitting URLs.
+Same treatment, more briefly, for extract-policy defaulting to `disc-only`.
 
 ### 13.4 Troubleshooting
 
@@ -1044,7 +991,7 @@ Written as symptom → cause → fix, because that's how someone arrives at it:
 
 ### 13.6 Build-order placement
 
-Documentation is **phase 12**, but written incrementally: each phase updates the config table and any decision it settles, while the phase is fresh. Deferring all of it to the end is how the "why" gets lost — by then the reasoning is reconstructed rather than recorded.
+Documentation is **phase 11**, but written incrementally: each phase updates the config table and any decision it settles, while the phase is fresh. Deferring all of it to the end is how the "why" gets lost — by then the reasoning is reconstructed rather than recorded.
 
 ---
 

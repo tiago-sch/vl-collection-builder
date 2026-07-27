@@ -23,7 +23,6 @@ export interface CreateJobInput {
   name?: string | null;
   regionPreference?: string[] | null;
   strictRegion?: boolean | null;
-  useResolver?: boolean;
 }
 
 function buildContext(platform: string, job: Job): ResolveContext {
@@ -75,15 +74,14 @@ export async function createJob(input: CreateJobInput): Promise<Job> {
   const jobId = transaction(() => {
     const info = db
       .prepare(
-        `INSERT INTO job (platform, name, region_preference, strict_region, resolver_used, created_at, status)
-         VALUES (?, ?, ?, ?, ?, ?, 'resolving')`,
+        `INSERT INTO job (platform, name, region_preference, strict_region, created_at, status)
+         VALUES (?, ?, ?, ?, ?, 'resolving')`,
       )
       .run(
         input.platform,
         input.name ?? null,
         JSON.stringify(regionPreference),
         strictRegion ? 1 : 0,
-        null, // tier 3 is phase 8
         createdAt,
       );
 
@@ -120,8 +118,8 @@ export async function runResolution(jobId: number): Promise<void> {
   );
   const clearCandidates = db.prepare('DELETE FROM match_candidate WHERE job_item_id = ?');
   const insertCandidate = db.prepare(
-    `INSERT INTO match_candidate (job_item_id, entry_id, score, base_score, rank, llm_note)
-     VALUES (?, ?, ?, ?, ?, NULL)`,
+    `INSERT INTO match_candidate (job_item_id, entry_id, score, base_score, rank)
+     VALUES (?, ?, ?, ?, ?)`,
   );
 
   for (const item of items) {
@@ -169,7 +167,6 @@ interface JobRow {
   name: string | null;
   region_preference: string | null;
   strict_region: number;
-  resolver_used: string | null;
   created_at: string;
   status: Job['status'];
 }
@@ -190,7 +187,6 @@ function toJob(r: JobRow): Job {
     name: r.name,
     regionPreference,
     strictRegion: r.strict_region === 1,
-    resolverUsed: r.resolver_used,
     createdAt: r.created_at,
     status: r.status,
   };
@@ -275,7 +271,7 @@ export function listItems(jobId: number, status?: JobItemStatus): JobItem[] {
 
   return rows.map((r) => {
     const candRows = candStmt.all(r.id) as unknown as Array<{
-      entry_id: number; score: number; base_score: number; rank: number; llm_note: string | null;
+      entry_id: number; score: number; base_score: number; rank: number;
       vault_id: number; title: string; region: string | null; regions: string;
       version: string | null; languages: string | null; rating: number | null; url: string;
     }>;
@@ -301,7 +297,6 @@ export function listItems(jobId: number, status?: JobItemStatus): JobItem[] {
         score: c.score,
         baseScore: c.base_score,
         rank: c.rank,
-        llmNote: c.llm_note,
         libraryState: owned.has(c.vault_id) ? 'in_library' : 'none',
       };
     });
@@ -334,7 +329,7 @@ export type ResolveAction =
  *
  * Choosing a catalogue entry writes a learned alias — the confirmation is ground
  * truth, so the same input resolves instantly and for free next time (plan §4.3),
- * and the accumulated pairs are the eval set for §4.5.
+ * and the accumulated pairs are the eval set for §4.4.
  */
 export function resolveJobItem(jobId: number, itemId: number, action: ResolveAction): JobItem | null {
   const job = getJob(jobId);
@@ -355,7 +350,7 @@ export function resolveJobItem(jobId: number, itemId: number, action: ResolveAct
     const url = action.manualUrl.trim();
     if (!/^https?:\/\//i.test(url)) throw new Error('manualUrl must be an http(s) URL');
     db.prepare(
-      "UPDATE job_item SET status = 'confirmed', resolved_tier = 4, manual_url = ?, chosen_entry = NULL, resolved_at = ? WHERE id = ?",
+      "UPDATE job_item SET status = 'confirmed', resolved_tier = 3, manual_url = ?, chosen_entry = NULL, resolved_at = ? WHERE id = ?",
     ).run(url, nowIso(), itemId);
   } else {
     const entry = entryById(action.entryId);
@@ -364,7 +359,7 @@ export function resolveJobItem(jobId: number, itemId: number, action: ResolveAct
       throw new Error('that entry belongs to a different platform');
     }
     db.prepare(
-      "UPDATE job_item SET status = 'confirmed', resolved_tier = 4, chosen_entry = ?, manual_url = NULL, confidence = 1, resolved_at = ? WHERE id = ?",
+      "UPDATE job_item SET status = 'confirmed', resolved_tier = 3, chosen_entry = ?, manual_url = NULL, confidence = 1, resolved_at = ? WHERE id = ?",
     ).run(entry.id, nowIso(), itemId);
     recordLearnedAlias(job.platform, item.input_norm, entry, 'user');
   }

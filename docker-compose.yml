@@ -63,9 +63,4 @@ services:
       WORK_PATH: ""                    # default: /library/.tmp — see §9.6b for NAS
       ORGANIZE_MIN_FREE_DISK_MB: "4096"
 
-      # --- optional resolver (phase 8, not built; absent key => tier 3 skipped) ---
-      RESOLVER: ""
-      GEMINI_API_KEY: ""
-      RESOLVER_MODEL: ""
-      RESOLVER_MAX_ITEMS: "50"
     restart: unless-stopped

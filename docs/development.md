@@ -59,7 +59,7 @@ npm run test:watch
 npm run typecheck
 ```
 
-130 tests, no network access required. Fixtures in
+134 tests, no network access required. Fixtures in
 `packages/server/test/fixtures/` are real saved pages from the source site.
 
 Two tests shell out to `zip`, which is present on macOS and most Linux
@@ -90,8 +90,8 @@ time rather than reading back the answer key. Reports resolution rate, wrong-mat
 rate and a tier breakdown.
 
 The evaluation set is built from your own review confirmations, so it fills up as
-you use the tool. This is what makes "is the optional AI resolver worth a key?" an
-answerable question rather than a matter of taste.
+you use the tool. It is the honest way to judge a change to normalisation,
+scoring or the alias table: make the change, re-run, compare.
 
 ## Adding a platform
 
@@ -170,8 +170,3 @@ that convention needs a root entrypoint that drops privileges, and advertising
 the variables without implementing them would fail silently on the first write.
 Use Docker's `user:` directive to run as a different uid.
 
-## Not built
-
-Phase 8 of the plan — the optional LLM resolver — is not implemented. Tier 3 is
-skipped, which is the same path taken when no API key is configured, so nothing
-is stubbed or faked. `eval.ts` is ready to measure it when it lands.

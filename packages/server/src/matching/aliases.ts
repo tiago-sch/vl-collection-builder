@@ -127,7 +127,7 @@ export function recordLearnedAlias(
   platform: string,
   inputNorm: string,
   entry: CatalogEntry,
-  source: 'user' | 'static' | 'llm' = 'user',
+  source: 'user' | 'static' = 'user',
 ): void {
   if (!inputNorm) return;
   getDb()

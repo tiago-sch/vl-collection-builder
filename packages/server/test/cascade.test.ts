@@ -216,7 +216,9 @@ describe('manual URL escape hatch', () => {
       manualUrl: 'https://vimm.net/vault/99999',
     });
     expect(resolved!.status).toBe('confirmed');
-    expect(resolved!.resolvedTier).toBe(4);
+    // Tier 3 is the human tier. It was 4 when an LLM tier sat at 3; removing
+    // that closed the gap rather than leaving the scale with a hole in it.
+    expect(resolved!.resolvedTier).toBe(3);
 
     const next = await itemFor('another missing game');
     expect(() =>

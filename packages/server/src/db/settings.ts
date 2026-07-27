@@ -58,7 +58,6 @@ export function getSettings(): AppSettings {
     maxCandidates: num('max_candidates', Number(settingDefaults.max_candidates)),
     crawlDelayMs: num('crawl_delay_ms', Number(settingDefaults.crawl_delay_ms)),
     staleAfterDays: num('stale_after_days', Number(settingDefaults.stale_after_days)),
-    resolverProvider: getRaw('resolver_provider') || null,
     setupCompletedAt: getRaw('setup_completed_at'),
   };
 }
@@ -82,7 +81,6 @@ export interface SettingsPatch {
   maxCandidates?: number;
   crawlDelayMs?: number;
   staleAfterDays?: number;
-  resolverProvider?: string | null;
 }
 
 export function updateSettings(patch: SettingsPatch): AppSettings {
@@ -96,7 +94,6 @@ export function updateSettings(patch: SettingsPatch): AppSettings {
   if (patch.maxCandidates !== undefined) setRaw('max_candidates', String(patch.maxCandidates));
   if (patch.crawlDelayMs !== undefined) setRaw('crawl_delay_ms', String(patch.crawlDelayMs));
   if (patch.staleAfterDays !== undefined) setRaw('stale_after_days', String(patch.staleAfterDays));
-  if (patch.resolverProvider !== undefined) setRaw('resolver_provider', patch.resolverProvider ?? '');
   return getSettings();
 }
 
