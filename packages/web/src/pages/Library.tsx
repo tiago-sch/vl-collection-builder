@@ -12,7 +12,7 @@ export function Library() {
   const [files, setFiles] = useState<(LibraryFile & { extractable: boolean })[]>([]);
   const [extract, setExtract] = useState<ExtractState | null>(null);
   const [expanded, setExpanded] = useState<number | null>(null);
-  const [fileFilter, setFileFilter] = useState<'all' | 'on-disk' | 'missing'>('all');
+  const [fileFilter, setFileFilter] = useState<'all' | 'on-disk' | 'zipped' | 'missing'>('all');
 
   const load = (): void => {
     void api
@@ -54,7 +54,10 @@ export function Library() {
 
   // Poll only while a job is actually running.
   useEffect(() => {
-    if (!extract?.running && extract?.queued === 0) return;
+    // Only after a job has actually been started. Polling on mount produced a
+    // spurious "Extracted 0." the moment the page loaded.
+    if (!extract) return;
+    if (!extract.running && extract.queued === 0) return;
     const t = setInterval(() => {
       void api.extractStatus().then((s) => {
         setExtract(s);
@@ -62,9 +65,9 @@ export function Library() {
           clearInterval(t);
           loadFiles();
           load();
-          setNotice(
-            `Extracted ${s.done}${s.failed ? `, ${s.failed} failed` : ''}.`,
-          );
+          if (s.done > 0 || s.failed > 0) {
+            setNotice(`Extracted ${s.done}${s.failed ? `, ${s.failed} failed` : ''}.`);
+          }
         }
       });
     }, 1000);
@@ -75,6 +78,17 @@ export function Library() {
 
   const withFiles = useMemo(
     () => new Set(files.map((f) => f.gameId).filter((id): id is number => id !== null)),
+    [files],
+  );
+
+  /** Games whose files include an archive that could still be extracted. */
+  const zipped = useMemo(
+    () =>
+      new Set(
+        files
+          .filter((f) => f.extractable && f.gameId !== null)
+          .map((f) => f.gameId as number),
+      ),
     [files],
   );
 
@@ -89,14 +103,16 @@ export function Library() {
       // disk — either never downloaded, or the files were moved or pruned.
       if (fileFilter === 'on-disk') return withFiles.has(g.id);
       if (fileFilter === 'missing') return !withFiles.has(g.id);
+      if (fileFilter === 'zipped') return zipped.has(g.id);
       return true;
     });
-  }, [games, filter, platform, fileFilter, withFiles]);
+  }, [games, filter, platform, fileFilter, withFiles, zipped]);
 
   const missingCount = useMemo(
     () => games.filter((g) => !withFiles.has(g.id)).length,
     [games, withFiles],
   );
+
 
   const toggle = (id: number): void =>
     setSelected((prev) => {
@@ -157,60 +173,36 @@ export function Library() {
         </div>
       ))}
 
-      <div className="panel">
-        <div className="row">
-          <input
-            type="text"
-            placeholder="Filter by name…"
-            value={filter}
-            onChange={(e) => setFilter(e.target.value)}
-            style={{ flex: 1, minWidth: 180 }}
-          />
-          <select
-            value={fileFilter}
-            onChange={(e) => setFileFilter(e.target.value as typeof fileFilter)}
-            style={{ width: 190 }}
-            title="Filter by whether the game has files organized on disk"
-          >
-            <option value="all">All games ({games.length})</option>
-            <option value="on-disk">On disk ({games.length - missingCount})</option>
-            <option value="missing">No files ({missingCount})</option>
-          </select>
-          <select
-            value={platform}
-            onChange={(e) => setPlatform(e.target.value)}
-            style={{ width: 160 }}
-          >
-            <option value="">All platforms</option>
-            {platforms.map((p) => (
-              <option key={p} value={p}>
-                {p}
-              </option>
-            ))}
-          </select>
-          <button
-            className="primary"
-            disabled={selected.size === 0}
-            onClick={() => void enqueue()}
-          >
-            Add {selected.size || ''} to downloads
-          </button>
-          {selectedArchives.length > 0 && (
-            <button
-              onClick={() => void runExtract()}
-              title="Extract these archives in place, applying the naming template"
-            >
-              Unzip {selectedArchives.length}
-            </button>
-          )}
-          {fileFilter === 'missing' && shown.length > 0 && (
-            <button
-              onClick={() => setSelected(new Set(shown.map((g) => g.id)))}
-              title="Select every game with no files, ready to queue"
-            >
-              Select all {shown.length}
-            </button>
-          )}
+      <div className="panel toolbar">
+        <input
+          className="toolbar-search"
+          type="text"
+          placeholder="Filter by name…"
+          value={filter}
+          onChange={(e) => setFilter(e.target.value)}
+        />
+        <select
+          value={fileFilter}
+          onChange={(e) => setFileFilter(e.target.value as typeof fileFilter)}
+          title="Filter by what is actually on disk"
+        >
+          <option value="all">All games ({games.length})</option>
+          <option value="on-disk">On disk ({games.length - missingCount})</option>
+          <option value="zipped">Still zipped ({zipped.size})</option>
+          <option value="missing">No files ({missingCount})</option>
+        </select>
+        <select value={platform} onChange={(e) => setPlatform(e.target.value)}>
+          <option value="">All platforms</option>
+          {platforms.map((p) => (
+            <option key={p} value={p}>
+              {p}
+            </option>
+          ))}
+        </select>
+
+        <div className="toolbar-spacer" />
+
+        <div className="btn-group">
           <a className="btn" href={exportUrl('minimal')} target="_blank" rel="noreferrer">
             Export JSON
           </a>
@@ -219,6 +211,43 @@ export function Library() {
           </a>
         </div>
       </div>
+
+      {/*
+        A contextual bar rather than permanently-disabled buttons: actions that
+        need a selection only appear once there is one, and they say what they
+        will act on.
+      */}
+      {selected.size > 0 && (
+        <div className="panel selection-bar">
+          <strong>{selected.size} selected</strong>
+          <button className="primary" onClick={() => void enqueue()}>
+            Add to downloads
+          </button>
+          {selectedArchives.length > 0 && (
+            <button
+              onClick={() => void runExtract()}
+              title="Extract in place, applying the naming template"
+            >
+              Unzip {selectedArchives.length}
+            </button>
+          )}
+          <div className="toolbar-spacer" />
+          <button onClick={() => setSelected(new Set())}>Clear</button>
+        </div>
+      )}
+
+      {selected.size === 0 && shown.length > 0 && (fileFilter === 'zipped' || fileFilter === 'missing') && (
+        <div className="panel selection-bar">
+          <span className="muted">
+            {fileFilter === 'zipped'
+              ? `${shown.length} game${shown.length === 1 ? '' : 's'} still zipped`
+              : `${shown.length} game${shown.length === 1 ? '' : 's'} with no files on disk`}
+          </span>
+          <button onClick={() => setSelected(new Set(shown.map((g) => g.id)))}>
+            Select all {shown.length}
+          </button>
+        </div>
+      )}
 
       <div className="panel" style={{ padding: 0, overflowX: 'auto' }}>
         <table>
@@ -237,9 +266,9 @@ export function Library() {
               </th>
               <th>Name</th>
               <th style={{ width: 90 }}>Platform</th>
-              <th style={{ width: 90 }}>Region</th>
-              <th style={{ width: 70 }}>Version</th>
-              <th style={{ width: 80 }}>Matched</th>
+              <th style={{ width: 90 }} className="hide-sm">Region</th>
+              <th style={{ width: 70 }} className="hide-sm">Version</th>
+              <th style={{ width: 80 }} className="hide-sm">Matched</th>
               <th style={{ width: 80 }}>Files</th>
               <th style={{ width: 100 }}>Vault</th>
               <th style={{ width: 40 }} />
@@ -266,9 +295,9 @@ export function Library() {
                   )}
                 </td>
                 <td className="muted">{g.platform}</td>
-                <td className="muted">{g.region ?? '—'}</td>
-                <td className="muted">{g.version ?? '—'}</td>
-                <td>
+                <td className="muted hide-sm">{g.region ?? '—'}</td>
+                <td className="muted hide-sm">{g.version ?? '—'}</td>
+                <td className="hide-sm">
                   {g.resolvedTier !== null ? (
                     <span className={`badge tier${g.resolvedTier}`}>
                       {TIER_LABELS[g.resolvedTier as ResolvedTier]}

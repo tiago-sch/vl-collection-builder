@@ -9,7 +9,7 @@ import { existsSync } from 'node:fs';
 import type { DownloadItem } from '@vl-collection-builder/shared';
 import { config } from '../config.js';
 import { getDb } from '../db/client.js';
-import { pruneMissingFiles, recordFiles } from '../db/library.js';
+import { linkOrphanFiles, pruneMissingFiles, recordFiles } from '../db/library.js';
 import { getPlatform } from '../sources/load.js';
 import { getDownload, listDownloads, setStatus } from '../download/queue.js';
 import { cleanWorkDir, organize } from './pipeline.js';
@@ -64,9 +64,20 @@ async function processOne(item: DownloadItem): Promise<void> {
     disc: item.disc,
   });
 
+  // A download queued by raw vault URL has no game row attached, which left its
+  // files invisible in the Library — including to the "still zipped" filter.
+  // The saved game for the same vault id is the obvious owner.
+  const linkedGameId =
+    item.gameId ??
+    ((
+      getDb()
+        .prepare('SELECT id FROM game WHERE platform = ? AND vault_id = ?')
+        .get(item.platform, item.vaultId) as { id: number } | undefined
+    )?.id ?? null);
+
   recordFiles(
     result.files.map((f) => ({ relPath: f.relPath, bytes: f.bytes, kind: f.kind })),
-    { downloadId: item.id, gameId: item.gameId, platform: item.platform },
+    { downloadId: item.id, gameId: linkedGameId, platform: item.platform },
   );
 
   setStatus(item.id, 'organized', result.warnings.length ? result.warnings.join(' · ') : null);
@@ -113,6 +124,9 @@ export async function startOrganizer(log: (m: string) => void = console.log): Pr
   if (pruned > 0) {
     log(`organizer: dropped ${pruned} library record(s) whose file is no longer on disk`);
   }
+
+  const linked = linkOrphanFiles();
+  if (linked > 0) log(`organizer: linked ${linked} library file(s) to their saved game`);
 
   const cleaned = await cleanWorkDir();
   if (cleaned === -1) {

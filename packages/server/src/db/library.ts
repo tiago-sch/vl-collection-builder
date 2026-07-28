@@ -88,6 +88,34 @@ export function pruneMissingFiles(libraryRoot: string): number {
   return gone.length;
 }
 
+/**
+ * Attach orphaned files to their game.
+ *
+ * Files from a download queued by raw vault URL have no game row, so they were
+ * invisible everywhere the Library groups by game — including the "still
+ * zipped" filter, which would report zero while a zipped file sat right there.
+ */
+export function linkOrphanFiles(): number {
+  const info = getDb()
+    .prepare(
+      `UPDATE library_file
+          SET game_id = (
+            SELECT g.id FROM game g
+             JOIN download d ON d.game_id IS NULL AND d.id = library_file.download_id
+            WHERE g.platform = library_file.platform AND g.vault_id = d.vault_id
+          )
+        WHERE game_id IS NULL
+          AND download_id IS NOT NULL
+          AND EXISTS (
+            SELECT 1 FROM game g
+             JOIN download d ON d.id = library_file.download_id
+            WHERE g.platform = library_file.platform AND g.vault_id = d.vault_id
+          )`,
+    )
+    .run();
+  return Number(info.changes);
+}
+
 export function fileById(id: number): LibraryFile | null {
   const row = getDb().prepare('SELECT * FROM library_file WHERE id = ?').get(id) as
     | Row
