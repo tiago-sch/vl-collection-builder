@@ -10,6 +10,7 @@
  */
 import { config } from '../config.js';
 import { assertClosed, recordFailure, recordSuccess } from './health.js';
+import { describeError } from '../util/errors.js';
 
 const SOURCE = 'vimm';
 
@@ -93,13 +94,15 @@ export function fetchPage(url: string, opts: FetchOptions = {}): Promise<string>
       }
     }
 
-    const health = recordFailure(SOURCE, lastError?.message ?? 'unknown error');
+    const described = lastError ? describeError(lastError) : 'unknown error';
+    const health = recordFailure(SOURCE, described);
     if (health.circuitOpen) {
       throw new Error(
-        `${lastError?.message ?? 'request failed'} — circuit opened after ${health.failureStreak} consecutive failures, retrying after ${health.retryAfter}`,
+        `${described} — circuit opened after ${health.failureStreak} consecutive failures, retrying after ${health.retryAfter}`,
       );
     }
-    throw lastError ?? new Error('request failed');
+    // Preserve the original as the cause so nothing upstream loses detail.
+    throw new Error(described, { cause: lastError });
   };
 
   // Queue on the shared chain; a rejection must not break the chain for others.

@@ -13,6 +13,7 @@ import { recordFiles } from '../db/library.js';
 import { getPlatform } from '../sources/load.js';
 import { getDownload, listDownloads, setStatus } from '../download/queue.js';
 import { cleanWorkDir, organize } from './pipeline.js';
+import { describeError, errorContext } from '../util/errors.js';
 
 let running = false;
 let stopped = false;
@@ -88,7 +89,9 @@ async function loop(): Promise<void> {
       } catch (err) {
         // Retryable by design: the staging archive is retained, so re-running
         // costs no bandwidth (plan §9.5).
-        setStatus(next.id, 'organize_error', (err as Error).message);
+        const detail = describeError(err);
+        console.warn(`organize ${next.id} failed: ${detail}`, errorContext(err));
+        setStatus(next.id, 'organize_error', detail);
       }
     }
   } finally {

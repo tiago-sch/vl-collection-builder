@@ -11,6 +11,7 @@ export function Library() {
   const [notice, setNotice] = useState<string | null>(null);
   const [files, setFiles] = useState<LibraryFile[]>([]);
   const [expanded, setExpanded] = useState<number | null>(null);
+  const [fileFilter, setFileFilter] = useState<'all' | 'on-disk' | 'missing'>('all');
 
   const load = (): void => {
     void api
@@ -31,14 +32,30 @@ export function Library() {
 
   const platforms = useMemo(() => [...new Set(games.map((g) => g.platform))].sort(), [games]);
 
+  const withFiles = useMemo(
+    () => new Set(files.map((f) => f.gameId).filter((id): id is number => id !== null)),
+    [files],
+  );
+
   const shown = useMemo(() => {
     const q = filter.trim().toLowerCase();
-    return games.filter(
-      (g) =>
-        (!platform || g.platform === platform) &&
-        (!q || g.name.toLowerCase().includes(q) || (g.inputName ?? '').toLowerCase().includes(q)),
-    );
-  }, [games, filter, platform]);
+    return games.filter((g) => {
+      if (platform && g.platform !== platform) return false;
+      if (q && !g.name.toLowerCase().includes(q) && !(g.inputName ?? '').toLowerCase().includes(q)) {
+        return false;
+      }
+      // "Missing" is the useful one: matched and saved, but nothing organized on
+      // disk — either never downloaded, or the files were moved or pruned.
+      if (fileFilter === 'on-disk') return withFiles.has(g.id);
+      if (fileFilter === 'missing') return !withFiles.has(g.id);
+      return true;
+    });
+  }, [games, filter, platform, fileFilter, withFiles]);
+
+  const missingCount = useMemo(
+    () => games.filter((g) => !withFiles.has(g.id)).length,
+    [games, withFiles],
+  );
 
   const toggle = (id: number): void =>
     setSelected((prev) => {
@@ -97,6 +114,16 @@ export function Library() {
             style={{ flex: 1, minWidth: 180 }}
           />
           <select
+            value={fileFilter}
+            onChange={(e) => setFileFilter(e.target.value as typeof fileFilter)}
+            style={{ width: 190 }}
+            title="Filter by whether the game has files organized on disk"
+          >
+            <option value="all">All games ({games.length})</option>
+            <option value="on-disk">On disk ({games.length - missingCount})</option>
+            <option value="missing">No files ({missingCount})</option>
+          </select>
+          <select
             value={platform}
             onChange={(e) => setPlatform(e.target.value)}
             style={{ width: 160 }}
@@ -115,6 +142,14 @@ export function Library() {
           >
             Add {selected.size || ''} to downloads
           </button>
+          {fileFilter === 'missing' && shown.length > 0 && (
+            <button
+              onClick={() => setSelected(new Set(shown.map((g) => g.id)))}
+              title="Select every game with no files, ready to queue"
+            >
+              Select all {shown.length}
+            </button>
+          )}
           <a className="btn" href={exportUrl('minimal')} target="_blank" rel="noreferrer">
             Export JSON
           </a>
@@ -232,7 +267,9 @@ export function Library() {
                 <td colSpan={9} className="muted" style={{ padding: 20, textAlign: 'center' }}>
                   {games.length === 0
                     ? 'Nothing saved yet — run an import.'
-                    : 'No games match that filter.'}
+                    : fileFilter === 'missing'
+                      ? 'Every game has files on disk.'
+                      : 'No games match that filter.'}
                 </td>
               </tr>
             )}

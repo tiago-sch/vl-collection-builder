@@ -31,6 +31,7 @@ import type { DownloadItem, DownloadProgress } from '@vl-collection-builder/shar
 import { config } from '../config.js';
 import { fetchPage } from '../catalog/fetcher.js';
 import { freeDiskMb } from '../util/disk.js';
+import { describeError, errorContext } from '../util/errors.js';
 import {
   bumpAttempts,
   claimNext,
@@ -368,11 +369,19 @@ async function loop(): Promise<void> {
         const attempts = bumpAttempts(item.id);
         const retryable = e instanceof DownloadError ? e.retryable : true;
 
+        // `fetch failed` on its own says nothing. describeError unwraps the
+        // cause chain so the recorded message names the actual failure.
+        const detail = describeError(err);
+        console.warn(
+          `download ${item.id} (${item.title}) failed on attempt ${attempts}: ${detail}`,
+          errorContext(err),
+        );
+
         if (retryable && attempts < config.downloadRetryLimit) {
-          setStatus(item.id, 'queued', e.message);
+          setStatus(item.id, 'queued', detail);
           await sleep(Math.min(60_000, config.interDownloadDelayMs * 2 ** attempts));
         } else {
-          setStatus(item.id, 'error', e.message);
+          setStatus(item.id, 'error', detail);
           emit({
             id: item.id,
             status: 'error',

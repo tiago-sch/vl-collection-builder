@@ -15,6 +15,7 @@
 import type { Platform, SyncProgress } from '@vl-collection-builder/shared';
 import { syncPlatform, type SyncResult } from './sync.js';
 import { setSyncStatus } from '../db/catalog.js';
+import { describeError, errorContext } from '../util/errors.js';
 
 export interface SyncRun {
   platform: string;
@@ -102,7 +103,7 @@ export function startSync(platform: Platform): SyncRun {
       run.result = result;
       publish(run, { ...run.progress, section: 'done', status: 'idle', entriesSeen: result.entriesSeen });
     } catch (err) {
-      const message = (err as Error).message;
+      const message = describeError(err);
       const cancelled = run.controller.signal.aborted;
 
       if (cancelled) {
@@ -111,6 +112,7 @@ export function startSync(platform: Platform): SyncRun {
         setSyncStatus(platform.slug, 'idle', null);
         publish(run, { ...run.progress, section: 'cancelled', status: 'idle', message: 'sync cancelled' });
       } else {
+        console.warn(`catalogue sync for ${platform.slug} failed: ${message}`, errorContext(err));
         run.error = message;
         setSyncStatus(platform.slug, 'error', message);
         publish(run, { ...run.progress, section: 'error', status: 'error', message });
