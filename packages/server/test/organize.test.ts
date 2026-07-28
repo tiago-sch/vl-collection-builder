@@ -14,8 +14,10 @@ import {
 import { cueReferences, rewriteCcd, rewriteCue, rewriteGdi } from '../src/organize/cue.js';
 import {
   extractZip,
+  is7z,
   isAuxiliaryFile,
   isSafeEntryPath,
+  isSupportedArchive,
   shouldExtract,
   UnsafeArchiveError,
   zipEntries,
@@ -355,3 +357,27 @@ function crc32Hex(buf: Buffer): string {
   }
   return ((~c) >>> 0).toString(16).padStart(8, '0');
 }
+
+describe('7z archives', () => {
+  // Vimm serves disc platforms as .7z — 169 of 170 files in a real PS2 library.
+  // Treating only .zip as supported meant every one of those was copied through
+  // untouched: no extraction, no CHD conversion, and a library of raw archives.
+  it('counts .7z as a supported archive', () => {
+    expect(isSupportedArchive('Ape Escape 3 (USA).7z')).toBe(true);
+    expect(isSupportedArchive('Super Mario World (USA).zip')).toBe(true);
+    expect(isSupportedArchive('game.rar')).toBe(false);
+    expect(isSupportedArchive('game.iso')).toBe(false);
+  });
+
+  it('identifies which handler an archive needs', () => {
+    expect(is7z('Ape Escape 3 (USA).7z')).toBe(true);
+    expect(is7z('Ape Escape 3 (USA).ZIP')).toBe(false);
+  });
+
+  it('vets 7z entry paths with the same rule as zip', () => {
+    // extract7z lists before extracting and rejects the archive whole, so a
+    // traversal entry cannot be written even though 7z does the extracting.
+    expect(isSafeEntryPath('/library/.tmp/1', 'Ape Escape 3 (USA).iso')).toBe(true);
+    expect(isSafeEntryPath('/library/.tmp/1', '../../etc/passwd')).toBe(false);
+  });
+});

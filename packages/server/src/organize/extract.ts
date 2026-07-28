@@ -9,11 +9,15 @@
  * containing any traversal entry is rejected whole rather than partially
  * extracted — a half-extracted malicious archive is still a compromised system.
  */
+import { execFile } from 'node:child_process';
 import { createWriteStream } from 'node:fs';
-import { mkdir } from 'node:fs/promises';
-import { dirname, join, resolve, sep } from 'node:path';
+import { mkdir, readdir, stat } from 'node:fs/promises';
+import { dirname, join, relative, resolve, sep } from 'node:path';
 import { pipeline } from 'node:stream/promises';
+import { promisify } from 'node:util';
 import yauzl from 'yauzl';
+
+const run = promisify(execFile);
 
 export interface ExtractResult {
   files: string[];
@@ -214,7 +218,124 @@ export function isArchive(fileName: string): boolean {
   return /\.(zip|7z|rar)$/i.test(fileName);
 }
 
-/** Only zip is handled in-process; the others would need a binary in the image. */
+export function is7z(fileName: string): boolean {
+  return /\.7z$/i.test(fileName);
+}
+
+/**
+ * Archives the organizer can actually open.
+ *
+ * Vimm serves disc platforms as .7z — 169 of 170 files in a real PS2 library —
+ * so treating only .zip as supported meant every PS2 download was copied
+ * through untouched: no extraction, no CHD conversion, and a library of raw
+ * archives no emulator can read.
+ */
 export function isSupportedArchive(fileName: string): boolean {
-  return /\.zip$/i.test(fileName);
+  return /\.(zip|7z)$/i.test(fileName);
+}
+
+let sevenZipChecked: string | null | undefined;
+
+/** Locate the 7z binary once. p7zip-full installs it as `7z`. */
+export async function sevenZipBinary(): Promise<string | null> {
+  if (sevenZipChecked !== undefined) return sevenZipChecked;
+  for (const candidate of ['7z', '7za', '7zz']) {
+    try {
+      await run(candidate, ['i'], { timeout: 10_000 });
+      sevenZipChecked = candidate;
+      return candidate;
+    } catch (err) {
+      // Ran but exited non-zero still means it exists.
+      if ((err as { code?: string }).code !== 'ENOENT') {
+        sevenZipChecked = candidate;
+        return candidate;
+      }
+    }
+  }
+  sevenZipChecked = null;
+  return null;
+}
+
+/**
+ * Read a 7z index via `7z l -slt`, which prints one block per entry.
+ *
+ * Same contract as zipEntries: names and CRCs without extracting, so a 2 GB
+ * archive can be vetted and identified cheaply.
+ */
+export async function sevenZipEntries(archivePath: string): Promise<ZipEntryInfo[]> {
+  const bin = await sevenZipBinary();
+  if (!bin) throw new Error('7z is not installed in this image');
+
+  const { stdout } = await run(bin, ['l', '-slt', '-ba', '--', archivePath], {
+    maxBuffer: 32 * 1024 * 1024,
+  });
+
+  const entries: ZipEntryInfo[] = [];
+  for (const block of stdout.split(/\r?\n\r?\n/)) {
+    const path = /^Path = (.+)$/m.exec(block)?.[1];
+    if (!path) continue;
+    const attributes = /^Attributes = (.+)$/m.exec(block)?.[1] ?? '';
+    if (/^D/.test(attributes) || attributes.includes('D_')) continue; // directory
+    entries.push({
+      fileName: path,
+      crc32: (/^CRC = ([0-9A-Fa-f]+)$/m.exec(block)?.[1] ?? '').toLowerCase().padStart(8, '0'),
+      uncompressedSize: Number(/^Size = (\d+)$/m.exec(block)?.[1] ?? 0),
+    });
+  }
+  return entries;
+}
+
+/** Extract a .7z, vetting every entry path first, exactly as extractZip does. */
+export async function extract7z(archivePath: string, destDir: string): Promise<ExtractResult> {
+  const bin = await sevenZipBinary();
+  if (!bin) throw new Error('7z is not installed in this image');
+
+  const entries = await sevenZipEntries(archivePath);
+  for (const e of entries) {
+    if (!isSafeEntryPath(destDir, e.fileName)) throw new UnsafeArchiveError(e.fileName);
+  }
+
+  await mkdir(destDir, { recursive: true });
+  // `x` preserves paths; `e` would flatten them and collide multi-track discs.
+  await run(bin, ['x', '-y', `-o${destDir}`, '--', archivePath], {
+    maxBuffer: 32 * 1024 * 1024,
+    timeout: 0,
+  });
+
+  // Trust the filesystem over the listing: what landed is what matters.
+  const files: string[] = [];
+  let totalBytes = 0;
+  const walk = async (dir: string): Promise<void> => {
+    for (const name of await readdir(dir)) {
+      const full = join(dir, name);
+      const st = await stat(full);
+      if (st.isDirectory()) await walk(full);
+      else {
+        files.push(full);
+        totalBytes += st.size;
+      }
+    }
+  };
+  await walk(destDir);
+  return { files, totalBytes };
+}
+
+/** Read any supported archive's index. */
+export async function archiveEntries(archivePath: string): Promise<ZipEntryInfo[]> {
+  return is7z(archivePath) ? sevenZipEntries(archivePath) : zipEntries(archivePath);
+}
+
+/** Extract any supported archive. */
+export async function extractArchive(
+  archivePath: string,
+  destDir: string,
+): Promise<ExtractResult> {
+  return is7z(archivePath) ? extract7z(archivePath, destDir) : extractZip(archivePath, destDir);
+}
+
+/** Total uncompressed size of any supported archive, for the space precheck. */
+export async function archiveUncompressedSize(archivePath: string): Promise<number> {
+  if (!is7z(archivePath)) return uncompressedSize(archivePath);
+  const entries = await sevenZipEntries(archivePath);
+  return entries.reduce((sum, e) => sum + e.uncompressedSize, 0);
 }

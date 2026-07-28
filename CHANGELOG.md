@@ -40,6 +40,8 @@ Behaviour discovered while building, all of which fails *silently* if ignored:
   first disc only. Mirroring without overriding the filters returns 1,831 PS2
   games instead of 11,420, and 1,826 of them are USA.
 - Listings **paginate at 200 rows**.
+- Disc platforms are served as **`.7z`**, not `.zip`. An organizer that handles
+  only zip copies them through untouched — no extraction, no CHD conversion.
 - Every listing row carries a **hidden honeypot link** to `/vault/999999`.
 - The download form declares `method="POST"` but is **submitted as GET**.
 - **Range requests starting at offset 0 return the last bytes of the file**, not

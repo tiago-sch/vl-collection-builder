@@ -156,6 +156,11 @@ zipped ROMs natively, so a zipped SNES library is a fraction of the size and
 works identically. Disc images must be extracted — no emulator mounts a 4 GB ISO
 from inside a zip. That is what `EXTRACT_POLICY=disc-only` means.
 
+**Vimm serves disc platforms as `.7z`**, not `.zip` — in a real PS2 library, 169
+of 170 files. The image ships `p7zip-full` so both are extracted natively; an
+archive format the organizer cannot open is copied through untouched, which
+means no extraction and no CHD conversion.
+
 If you need the raw file anyway — a front-end that will not read zips, a ROM
 hack to apply — select the games in the Library and hit **Unzip**. It re-runs
 the organizer with extraction forced rather than doing a bare unzip, so the

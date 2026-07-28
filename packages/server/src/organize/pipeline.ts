@@ -21,11 +21,11 @@ import { freeDiskMb } from '../util/disk.js';
 import { convertToChd, shouldConvert, type ChdPolicy } from './chd.js';
 import { isSidecar, rewriteSidecar, type RenameMap } from './cue.js';
 import {
-  extractZip,
+  archiveUncompressedSize,
+  extractArchive,
   isAuxiliaryFile,
   isSupportedArchive,
   shouldExtract,
-  uncompressedSize,
   type ExtractPolicy,
 } from './extract.js';
 import { buildM3u, discNumber, playlistCandidates } from './m3u.js';
@@ -128,7 +128,7 @@ export async function organize(input: OrganizeInput): Promise<OrganizeResult> {
   await mkdir(work, { recursive: true });
 
   try {
-    const archiveIsZip = isSupportedArchive(input.archivePath);
+    const archiveIsSupported = isSupportedArchive(input.archivePath);
     const extract =
       input.forceExtract === true ||
       shouldExtract(config.extractPolicy as ExtractPolicy, input.platform.discBased);
@@ -136,8 +136,8 @@ export async function organize(input: OrganizeInput): Promise<OrganizeResult> {
     // --- 1. space precheck -------------------------------------------------
     // Extraction needs archive + extracted size available at the same time;
     // disc images roughly double.
-    if (extract && archiveIsZip) {
-      const needBytes = await uncompressedSize(input.archivePath);
+    if (extract && archiveIsSupported) {
+      const needBytes = await archiveUncompressedSize(input.archivePath);
       const needMb = Math.ceil(needBytes / (1024 * 1024)) + config.organizeMinFreeDiskMb;
       const free = await freeDiskMb(workPath());
       if (free !== null && free < needMb) {
@@ -149,13 +149,13 @@ export async function organize(input: OrganizeInput): Promise<OrganizeResult> {
 
     // --- 2. extract or copy ------------------------------------------------
     let workFiles: string[] = [];
-    if (extract && archiveIsZip) {
-      const result = await extractZip(input.archivePath, work);
+    if (extract && archiveIsSupported) {
+      const result = await extractArchive(input.archivePath, work);
       workFiles = result.files;
     } else {
-      if (extract && !archiveIsZip) {
+      if (extract && !archiveIsSupported) {
         warnings.push(
-          `${basename(input.archivePath)} is not a .zip; copied across without extracting (7z/rar would need p7zip in the image)`,
+          `${basename(input.archivePath)} is not a .zip or .7z, so it was copied across without extracting`,
         );
       }
       const target = join(work, sanitizeSegment(basename(input.archivePath)));
@@ -181,7 +181,7 @@ export async function organize(input: OrganizeInput): Promise<OrganizeResult> {
     // archive there would compare a .zip against the ROM's checksum and fail
     // every time. Those downloads are verified by CRC32 at download time
     // instead — see download/worker.ts.
-    const extractedForVerification = extract && archiveIsZip;
+    const extractedForVerification = extract && archiveIsSupported;
     if (extractedForVerification && (input.expectSha1 || input.expectMd5) && workFiles.length === 1) {
       const algo = input.expectSha1 ? 'sha1' : 'md5';
       const want = (input.expectSha1 ?? input.expectMd5)!.toLowerCase();

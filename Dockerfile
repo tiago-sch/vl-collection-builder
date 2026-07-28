@@ -34,12 +34,16 @@ RUN npm prune --omit=dev
 FROM node:24-bookworm-slim AS runtime
 WORKDIR /app
 
+# p7zip-full for `7z`: Vimm serves disc-based platforms as .7z, not .zip — 169
+# of 170 files in a real PS2 library. Without it the organizer copies archives
+# through untouched, so nothing is extracted and nothing is CHD-converted.
+#
 # chdman, from the MAME toolchain (~30-40 MB). It packs .bin/.cue and .iso into a
 # single compressed .chd, typically 40-60% smaller with no data loss — for a PS2
 # or PS1 library that is the difference between 400 GB and roughly 200. Given
 # that, the image cost is not a close call (plan §9.5b).
 RUN apt-get update \
- && apt-get install -y --no-install-recommends mame-tools \
+ && apt-get install -y --no-install-recommends mame-tools p7zip-full \
  && rm -rf /var/lib/apt/lists/*
 
 ENV NODE_ENV=production \

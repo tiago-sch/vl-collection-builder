@@ -42,7 +42,7 @@ import {
   setProgress,
   setStatus,
 } from './queue.js';
-import { isAuxiliaryFile, zipEntries } from '../organize/extract.js';
+import { archiveEntries, isAuxiliaryFile, isSupportedArchive } from '../organize/extract.js';
 import {
   DEFAULT_DOWNLOAD_USER_AGENT,
   downloadHeaders,
@@ -276,9 +276,9 @@ export async function finalize(item: DownloadItem, partPath: string): Promise<st
 
   // --- identity, via the zip index -----------------------------------------
   const expectCrc = fresh?.expectCrc32 ?? null;
-  if (expectCrc && /\.zip$/i.test(finalPath)) {
+  if (expectCrc && isSupportedArchive(finalPath)) {
     try {
-      const entries = await zipEntries(partPath);
+      const entries = await archiveEntries(partPath);
       const content = entries.filter((e) => !isAuxiliaryFile(e.fileName));
       // Only assert when the archive holds exactly one game file. Multi-track
       // discs publish one checksum for a set of several, and guessing which it

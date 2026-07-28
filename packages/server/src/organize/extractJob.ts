@@ -21,6 +21,7 @@ import { getDb } from '../db/client.js';
 import { deleteFile, fileById, recordFiles } from '../db/library.js';
 import { getPlatform } from '../sources/load.js';
 import { describeError, errorContext } from '../util/errors.js';
+import { isSupportedArchive } from './extract.js';
 import { organize } from './pipeline.js';
 
 export interface ExtractJobState {
@@ -48,14 +49,14 @@ export function getExtractState(): ExtractJobState {
 
 /** Which library files could usefully be extracted. */
 export function isExtractable(kind: string | null, relPath: string): boolean {
-  return kind === 'archive' && /\.zip$/i.test(relPath);
+  return kind === 'archive' && isSupportedArchive(relPath);
 }
 
 async function processOne(fileId: number): Promise<void> {
   const file = fileById(fileId);
   if (!file) throw new Error(`library file ${fileId} no longer exists`);
   if (!isExtractable(file.kind, file.relPath)) {
-    throw new Error(`${file.relPath} is not an archive that can be extracted`);
+    throw new Error(`${file.relPath} is not a .zip or .7z that can be extracted`);
   }
 
   const abs = join(config.libraryPath, file.relPath);
@@ -76,7 +77,7 @@ async function processOne(fileId: number): Promise<void> {
 
   // Falling back to the filename keeps files that arrived by raw vault URL
   // working — they have no game row to read from.
-  const fallbackTitle = file.relPath.split('/').pop()!.replace(/\.zip$/i, '');
+  const fallbackTitle = file.relPath.split('/').pop()!.replace(/\.(zip|7z)$/i, '');
 
   const result = await organize({
     downloadId: file.downloadId ?? 0,
@@ -141,7 +142,7 @@ export function queueExtract(fileIds: number[]): { queued: number; skipped: stri
       continue;
     }
     if (!isExtractable(file.kind, file.relPath)) {
-      skipped.push(`${file.relPath} is not a .zip`);
+      skipped.push(`${file.relPath} is not a .zip or .7z`);
       continue;
     }
     if (pending.includes(id)) continue;
