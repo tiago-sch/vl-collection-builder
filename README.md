@@ -156,6 +156,13 @@ zipped ROMs natively, so a zipped SNES library is a fraction of the size and
 works identically. Disc images must be extracted — no emulator mounts a 4 GB ISO
 from inside a zip. That is what `EXTRACT_POLICY=disc-only` means.
 
+If you need the raw file anyway — a front-end that will not read zips, a ROM
+hack to apply — select the games in the Library and hit **Unzip**. It re-runs
+the organizer with extraction forced rather than doing a bare unzip, so the
+result still gets the naming template, the subfolder rule and CHD conversion.
+Unzipping by hand next to everything else is how a library stops being
+consistent.
+
 **Disc images become `.chd`.** Typically 40–60% smaller with no data loss, read
 natively by the major emulators. `chdman verify` runs on every output *before*
 the source is deleted. See [docs/naming.md](docs/naming.md) for the full naming

@@ -1,4 +1,6 @@
 /** Data access for organized library files (plan §9.5). */
+import { existsSync } from 'node:fs';
+import { join } from 'node:path';
 import type { LibraryFile } from '@vl-collection-builder/shared';
 import { getDb, nowIso } from './client.js';
 
@@ -64,6 +66,37 @@ export function gameIdsWithFiles(): Set<number> {
     .prepare('SELECT DISTINCT game_id FROM library_file WHERE game_id IS NOT NULL')
     .all() as unknown as Array<{ game_id: number }>;
   return new Set(rows.map((r) => r.game_id));
+}
+
+/**
+ * Drop rows whose file is no longer on disk.
+ *
+ * Files get moved, pruned or tidied up outside this tool, and a stale row makes
+ * the Library's "on disk" / "no files" filter lie — which is the one thing that
+ * filter exists to tell you. Cheap enough to run at every boot.
+ */
+export function pruneMissingFiles(libraryRoot: string): number {
+  const rows = getDb()
+    .prepare('SELECT id, rel_path FROM library_file')
+    .all() as unknown as Array<{ id: number; rel_path: string }>;
+
+  const gone = rows.filter((r) => !existsSync(join(libraryRoot, r.rel_path)));
+  if (gone.length === 0) return 0;
+
+  const stmt = getDb().prepare('DELETE FROM library_file WHERE id = ?');
+  for (const r of gone) stmt.run(r.id);
+  return gone.length;
+}
+
+export function fileById(id: number): LibraryFile | null {
+  const row = getDb().prepare('SELECT * FROM library_file WHERE id = ?').get(id) as
+    | Row
+    | undefined;
+  return row ? toFile(row) : null;
+}
+
+export function deleteFile(id: number): void {
+  getDb().prepare('DELETE FROM library_file WHERE id = ?').run(id);
 }
 
 export function deleteFilesForDownload(downloadId: number): void {

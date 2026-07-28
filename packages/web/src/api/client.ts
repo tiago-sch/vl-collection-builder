@@ -16,6 +16,15 @@ import type {
   SyncProgress,
 } from '@vl-collection-builder/shared';
 
+export interface ExtractState {
+  queued: number;
+  done: number;
+  failed: number;
+  running: boolean;
+  current: string | null;
+  errors: { file: string; error: string }[];
+}
+
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
   const res = await fetch(`/api${path}`, {
     headers: init?.body ? { 'content-type': 'application/json' } : undefined,
@@ -151,7 +160,17 @@ export const api = {
     ),
 
   libraryFiles: (platform?: string) =>
-    request<{ files: LibraryFile[] }>(`/library/files${platform ? `?platform=${platform}` : ''}`),
+    request<{ files: (LibraryFile & { extractable: boolean })[] }>(
+      `/library/files${platform ? `?platform=${platform}` : ''}`,
+    ),
+
+  extractFiles: (body: { fileIds?: number[]; gameIds?: number[] }) =>
+    request<{ queued: number; skipped: string[]; state: ExtractState }>('/library/extract', {
+      method: 'POST',
+      body: JSON.stringify(body),
+    }),
+
+  extractStatus: () => request<ExtractState>('/library/extract/status'),
 
   libraryStatus: () =>
     request<{

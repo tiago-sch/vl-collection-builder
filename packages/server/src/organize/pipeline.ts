@@ -33,6 +33,14 @@ import { parseFolderMap, platformFolder, renderTemplate, sanitizeSegment } from 
 
 export interface OrganizeInput {
   downloadId: number;
+  /**
+   * Overrides EXTRACT_POLICY for this one item. Used by "unzip" on an already
+   * organized file: the policy correctly leaves cartridge ROMs zipped, but the
+   * point of the button is to ask for the exception.
+   */
+  forceExtract?: boolean;
+  /** Work-directory key. Defaults to the download id; library jobs pass their own. */
+  workKey?: string;
   /** SHA1 of the ROM as published on the vault page, if known. */
   expectSha1?: string | null;
   expectMd5?: string | null;
@@ -112,7 +120,7 @@ export async function organize(input: OrganizeInput): Promise<OrganizeResult> {
     disc: input.disc,
   });
 
-  const work = join(workPath(), String(input.downloadId));
+  const work = join(workPath(), input.workKey ?? String(input.downloadId));
   const libraryRoot = join(config.libraryPath, folder);
 
   // Clean any leftovers from a previous interrupted attempt.
@@ -121,10 +129,9 @@ export async function organize(input: OrganizeInput): Promise<OrganizeResult> {
 
   try {
     const archiveIsZip = isSupportedArchive(input.archivePath);
-    const extract = shouldExtract(
-      config.extractPolicy as ExtractPolicy,
-      input.platform.discBased,
-    );
+    const extract =
+      input.forceExtract === true ||
+      shouldExtract(config.extractPolicy as ExtractPolicy, input.platform.discBased);
 
     // --- 1. space precheck -------------------------------------------------
     // Extraction needs archive + extracted size available at the same time;

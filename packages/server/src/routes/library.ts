@@ -10,12 +10,57 @@ import {
   validateFolderMap,
 } from '../organize/naming.js';
 import { isOrganizing, requeueForOrganize } from '../organize/worker.js';
+import {
+  getExtractState,
+  isExtractable,
+  queueExtract,
+  resetExtractState,
+} from '../organize/extractJob.js';
 import { freeDiskMb } from '../util/disk.js';
 
 export async function libraryRoutes(app: FastifyInstance): Promise<void> {
   app.get<{ Querystring: { platform?: string } }>('/library/files', async (req) => ({
-    files: allFiles(req.query.platform),
+    files: allFiles(req.query.platform).map((f) => ({
+      ...f,
+      // Lets the UI offer "unzip" only where it would actually do something.
+      extractable: isExtractable(f.kind, f.relPath),
+    })),
   }));
+
+  /**
+   * Extract archives already in the library.
+   *
+   * Runs the full organizer with extraction forced rather than a bare unzip, so
+   * the result still gets the naming template, subfolder rule and CHD step.
+   * Returns immediately — a disc image takes minutes, and the job reports via
+   * /library/extract/status.
+   */
+  app.post<{ Body: { fileIds?: number[]; gameIds?: number[] } }>(
+    '/library/extract',
+    async (req, reply) => {
+      const body = req.body ?? {};
+      const ids = new Set<number>(body.fileIds ?? []);
+
+      for (const gameId of body.gameIds ?? []) {
+        for (const f of filesForGame(gameId)) {
+          if (isExtractable(f.kind, f.relPath)) ids.add(f.id);
+        }
+      }
+
+      if (ids.size === 0) {
+        return reply.code(400).send({
+          error: 'nothing_extractable',
+          detail: 'none of those files are archives that can be extracted',
+        });
+      }
+
+      resetExtractState();
+      const result = queueExtract([...ids]);
+      return { ...result, state: getExtractState() };
+    },
+  );
+
+  app.get('/library/extract/status', async () => getExtractState());
 
   app.get<{ Params: { id: string } }>('/library/files/game/:id', async (req) => ({
     files: filesForGame(Number(req.params.id)),

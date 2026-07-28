@@ -9,7 +9,7 @@ import { existsSync } from 'node:fs';
 import type { DownloadItem } from '@vl-collection-builder/shared';
 import { config } from '../config.js';
 import { getDb } from '../db/client.js';
-import { recordFiles } from '../db/library.js';
+import { pruneMissingFiles, recordFiles } from '../db/library.js';
 import { getPlatform } from '../sources/load.js';
 import { getDownload, listDownloads, setStatus } from '../download/queue.js';
 import { cleanWorkDir, organize } from './pipeline.js';
@@ -109,6 +109,11 @@ export async function startOrganizer(log: (m: string) => void = console.log): Pr
     log('organizer: disabled (ORGANIZE_ENABLED=false) — downloads stop at the staging directory');
     return;
   }
+  const pruned = pruneMissingFiles(config.libraryPath);
+  if (pruned > 0) {
+    log(`organizer: dropped ${pruned} library record(s) whose file is no longer on disk`);
+  }
+
   const cleaned = await cleanWorkDir();
   if (cleaned === -1) {
     log(

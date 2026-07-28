@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { TIER_LABELS, type Game, type LibraryFile, type ResolvedTier } from '@vl-collection-builder/shared';
-import { api } from '../api/client.js';
+import { api, type ExtractState } from '../api/client.js';
 
 export function Library() {
   const [games, setGames] = useState<Game[]>([]);
@@ -9,7 +9,8 @@ export function Library() {
   const [error, setError] = useState<string | null>(null);
   const [selected, setSelected] = useState<Set<number>>(new Set());
   const [notice, setNotice] = useState<string | null>(null);
-  const [files, setFiles] = useState<LibraryFile[]>([]);
+  const [files, setFiles] = useState<(LibraryFile & { extractable: boolean })[]>([]);
+  const [extract, setExtract] = useState<ExtractState | null>(null);
   const [expanded, setExpanded] = useState<number | null>(null);
   const [fileFilter, setFileFilter] = useState<'all' | 'on-disk' | 'missing'>('all');
 
@@ -21,14 +22,54 @@ export function Library() {
   };
 
   useEffect(load, []);
-  useEffect(() => {
+
+  const filesFor = (gameId: number): (LibraryFile & { extractable: boolean })[] =>
+    files.filter((f) => f.gameId === gameId);
+
+  const loadFiles = (): void => {
     void api
       .libraryFiles()
       .then((r) => setFiles(r.files))
       .catch(() => setFiles([]));
-  }, []);
+  };
 
-  const filesFor = (gameId: number): LibraryFile[] => files.filter((f) => f.gameId === gameId);
+  /** Archives among the current selection — what "unzip" would act on. */
+  const selectedArchives = useMemo(
+    () => files.filter((f) => f.extractable && f.gameId !== null && selected.has(f.gameId)),
+    [files, selected],
+  );
+
+  useEffect(loadFiles, []);
+
+  const runExtract = async (): Promise<void> => {
+    try {
+      const r = await api.extractFiles({ fileIds: selectedArchives.map((f) => f.id) });
+      setExtract(r.state);
+      setNotice(`Extracting ${r.queued} archive${r.queued === 1 ? '' : 's'}…`);
+      setSelected(new Set());
+    } catch (err) {
+      setError((err as Error).message);
+    }
+  };
+
+  // Poll only while a job is actually running.
+  useEffect(() => {
+    if (!extract?.running && extract?.queued === 0) return;
+    const t = setInterval(() => {
+      void api.extractStatus().then((s) => {
+        setExtract(s);
+        if (!s.running && s.queued === 0) {
+          clearInterval(t);
+          loadFiles();
+          load();
+          setNotice(
+            `Extracted ${s.done}${s.failed ? `, ${s.failed} failed` : ''}.`,
+          );
+        }
+      });
+    }, 1000);
+    return () => clearInterval(t);
+  }, [extract?.running, extract?.queued]);
 
   const platforms = useMemo(() => [...new Set(games.map((g) => g.platform))].sort(), [games]);
 
@@ -103,6 +144,18 @@ export function Library() {
 
       {error && <div className="banner error">{error}</div>}
       {notice && <div className="banner info">{notice}</div>}
+      {extract && (extract.running || extract.queued > 0) && (
+        <div className="banner info">
+          Extracting {extract.current ?? '…'} — {extract.done} done
+          {extract.queued > 0 && `, ${extract.queued} queued`}
+          {extract.failed > 0 && `, ${extract.failed} failed`}
+        </div>
+      )}
+      {extract?.errors.map((e) => (
+        <div className="banner error" key={e.file}>
+          {e.file}: {e.error}
+        </div>
+      ))}
 
       <div className="panel">
         <div className="row">
@@ -142,6 +195,14 @@ export function Library() {
           >
             Add {selected.size || ''} to downloads
           </button>
+          {selectedArchives.length > 0 && (
+            <button
+              onClick={() => void runExtract()}
+              title="Extract these archives in place, applying the naming template"
+            >
+              Unzip {selectedArchives.length}
+            </button>
+          )}
           {fileFilter === 'missing' && shown.length > 0 && (
             <button
               onClick={() => setSelected(new Set(shown.map((g) => g.id)))}
