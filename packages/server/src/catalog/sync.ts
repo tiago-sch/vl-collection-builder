@@ -22,17 +22,14 @@
  * is therefore applied to every listing request.
  */
 import type { Platform, SyncProgress } from '@vl-collection-builder/shared';
-import { fetchPage } from './fetcher.js';
+import { HttpError, fetchPage } from './fetcher.js';
 import { parseListing } from './parser.js';
 import { loadRegistry } from '../sources/load.js';
 import { completeSync, countEntries, setSyncStatus, upsertEntries } from '../db/catalog.js';
 import { getSettings } from '../db/settings.js';
 
 /** A-Z plus Vimm's numeric bucket. */
-export const SECTIONS = [
-  'number',
-  ...'ABCDEFGHIJKLMNOPQRSTUVWXYZ'.split(''),
-] as const;
+export const SECTIONS = ['number', ...'ABCDEFGHIJKLMNOPQRSTUVWXYZ'.split('')] as const;
 
 /**
  * Runaway guard. A section needing more than this many pages means either the
@@ -57,10 +54,7 @@ export interface SyncResult {
 }
 
 /** Appends the registry's filter parameters, expanding array values (countries[]). */
-function applyFilters(
-  params: URLSearchParams,
-  filters: Record<string, string | string[]>,
-): void {
+function applyFilters(params: URLSearchParams, filters: Record<string, string | string[]>): void {
   for (const [key, value] of Object.entries(filters)) {
     if (Array.isArray(value)) {
       for (const v of value) params.append(key, v);
@@ -128,24 +122,35 @@ export async function syncPlatform(
           page,
           registry.listFilters,
         );
-        const html = await fetchPage(url, {
-          delayMs: settings.crawlDelayMs,
-          onRetry: (attempt, error, waitMs) => {
-            // A 429 wait is a minute long; without this the UI looks hung.
-            const seconds = Math.round(waitMs / 1000);
-            console.warn(
-              `sync ${platform.slug} section ${section} page ${page}: ${error.message} — retry ${attempt} in ${seconds}s`,
-            );
-            opts.onProgress?.({
-              platform: platform.slug,
-              section: `${section} (waiting ${seconds}s, retry ${attempt})`,
-              sectionsDone: index,
-              sectionsTotal: SECTIONS.length,
-              entriesSeen,
-              status: 'running',
-            });
-          },
-        });
+        let html: string;
+        try {
+          html = await fetchPage(url, {
+            delayMs: settings.crawlDelayMs,
+            onRetry: (attempt, error, waitMs) => {
+              // A 429 wait is a minute long; without this the UI looks hung.
+              const seconds = Math.round(waitMs / 1000);
+              console.warn(
+                `sync ${platform.slug} section ${section} page ${page}: ${error.message} — retry ${attempt} in ${seconds}s`,
+              );
+              opts.onProgress?.({
+                platform: platform.slug,
+                section: `${section} (waiting ${seconds}s, retry ${attempt})`,
+                sectionsDone: index,
+                sectionsTotal: SECTIONS.length,
+                entriesSeen,
+                status: 'running',
+              });
+            },
+          });
+        } catch (err) {
+          // Vimm 404s a letter section that has no titles rather than serving
+          // an empty table — every smaller platform has a few. Skip the letter.
+          if (err instanceof HttpError && err.status === 404) {
+            pagesFetched += 1;
+            break;
+          }
+          throw err;
+        }
         pagesFetched += 1;
 
         const result = parseListing(html);
@@ -208,7 +213,15 @@ export async function syncPlatform(
       status: 'idle',
     });
 
-    return { platform: platform.slug, entriesSeen, inserted, updated, pagesFetched, entryCount, warnings };
+    return {
+      platform: platform.slug,
+      entriesSeen,
+      inserted,
+      updated,
+      pagesFetched,
+      entryCount,
+      warnings,
+    };
   } catch (err) {
     const message = (err as Error).message;
     setSyncStatus(platform.slug, 'error', message);
@@ -233,7 +246,11 @@ export async function syncPlatform(
  */
 export async function liveSearch(platform: Platform, query: string) {
   const { registry } = await loadRegistry();
-  const params = new URLSearchParams({ p: 'list', system: platform.system, q: query });
+  const params = new URLSearchParams({
+    p: 'list',
+    system: platform.system,
+    q: query,
+  });
   // Same filter treatment as the crawl: a live search that hides other regions
   // would be a worse escape hatch than the mirror it is meant to back up.
   applyFilters(params, registry.listFilters);

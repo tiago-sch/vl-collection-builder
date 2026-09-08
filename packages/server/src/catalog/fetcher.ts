@@ -132,6 +132,11 @@ export function fetchPage(url: string, opts: FetchOptions = {}): Promise<string>
       }
     }
 
+    // A 404 is the site answering, not failing: Vimm returns it for a letter
+    // section with no titles (3DS has no "Q"). It must not count toward the
+    // circuit breaker, or a small platform trips it on empty letters alone.
+    if (lastError instanceof HttpError && lastError.status === 404) throw lastError;
+
     const described = lastError ? describeError(lastError) : 'unknown error';
     const health = recordFailure(SOURCE, described);
     if (health.circuitOpen) {

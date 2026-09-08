@@ -35,6 +35,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Syncing a platform with an empty letter section (3DS has no "Q" titles)
+  failed with `HTTP 404`. Vimm answers 404 for such a section instead of an
+  empty page; it is now treated as empty and no longer counts toward the
+  circuit breaker.
+
 - Catalogue sync died with `HTTP 429` about twenty pages in. Vimm now
   rate-limits listing requests to roughly 20 per minute per IP and answers
   with `Retry-After: 60`; the fetcher retried in 2.4s, 4.8s and 9.6s, all
