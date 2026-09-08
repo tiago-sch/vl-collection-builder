@@ -54,7 +54,13 @@ export const config = {
   sourcesUrl: str('SOURCES_URL', ''),
 
   // --- crawler politeness ---
-  crawlDelayMs: int('CRAWL_DELAY_MS', 1200),
+  /**
+   * Vimm allows roughly 20 listing requests per minute per IP before it answers
+   * 429 for a minute (measured September 2026). Responses take ~2.5s, so this
+   * delay lands at ~10 requests/minute — half the quota, leaving room for the
+   * odd fast page and for a download running alongside a sync.
+   */
+  crawlDelayMs: int('CRAWL_DELAY_MS', 4000),
   userAgent: str('USER_AGENT', 'vl-collection-builder/0.1 (personal catalogue tool)'),
   requestTimeoutMs: int('REQUEST_TIMEOUT_MS', 30_000),
   maxRetries: int('CRAWL_MAX_RETRIES', 3),

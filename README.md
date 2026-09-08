@@ -211,7 +211,7 @@ mirror of this table.
 
 | Variable | Default | Notes |
 |---|---|---|
-| `CRAWL_DELAY_MS` | `1200` | One request per this many ms, single concurrency. A full PS2 sync is ~75 requests — about 7 minutes, once a month. |
+| `CRAWL_DELAY_MS` | `4000` | Pause after each request, single concurrency. Vimm allows roughly 20 listing requests per minute per IP before answering `429` for a minute; 4s lands at about 10/minute. A full PS2 sync is ~75 requests — about 8 minutes, once a month. Going below ~2000 will trip the limit. |
 | `USER_AGENT` | `vl-collection-builder/0.1 (personal catalogue tool)` | Honest and self-identifying. Used for all crawling. |
 | `REQUEST_TIMEOUT_MS` | `30000` | |
 | `CRAWL_MAX_RETRIES` | `3` | |

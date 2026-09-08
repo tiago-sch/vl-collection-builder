@@ -35,6 +35,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Catalogue sync died with `HTTP 429` about twenty pages in. Vimm now
+  rate-limits listing requests to roughly 20 per minute per IP and answers
+  with `Retry-After: 60`; the fetcher retried in 2.4s, 4.8s and 9.6s, all
+  inside the ban, then gave up. The default crawl delay is now 4s (about 10
+  requests/minute) and a 429 is waited out for the advertised window, with the
+  wait shown in the sync progress.
+
 - Listing pages parsed with no region, version or rating after Vimm rewrote the
   honeypot style as `display:  none` (two spaces); the table strategy now
   matches the style with a regex, and versioned `/vault/<id>?v=1.0` rows are

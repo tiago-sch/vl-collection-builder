@@ -27,11 +27,41 @@ export class HttpError extends Error {
   constructor(
     public readonly status: number,
     public readonly url: string,
+    /** Server-requested wait before trying again, from Retry-After. */
+    public readonly retryAfterMs: number | null = null,
   ) {
     super(`HTTP ${status} for ${url}`);
     this.name = 'HttpError';
   }
 }
+
+/**
+ * Retry-After is either delta-seconds or an HTTP-date. Vimm sends `60`.
+ * Anything unparseable is treated as absent so a garbage header cannot stall
+ * the crawl.
+ */
+export function parseRetryAfter(header: string | null): number | null {
+  if (!header) return null;
+  const seconds = Number(header.trim());
+  if (Number.isFinite(seconds) && seconds >= 0) return seconds * 1000;
+  // Date.parse is lenient enough to accept "-3"; an HTTP-date always names a
+  // weekday and month, so demand a letter before treating it as one.
+  if (!/[A-Za-z]/.test(header)) return null;
+  const at = Date.parse(header);
+  if (Number.isFinite(at)) return Math.max(0, at - Date.now());
+  return null;
+}
+
+/**
+ * Vimm rate-limits listing requests to roughly 20 per minute per IP
+ * (September 2026: a 429 with `Retry-After: 60` after ~20 pages). A retry
+ * that ignores the header and comes back in seconds lands inside the ban and
+ * extends it, so a 429 is waited out for at least the advertised window.
+ * Capped so a hostile or broken header cannot hang a sync for an hour.
+ */
+const MAX_RETRY_AFTER_MS = 5 * 60_000;
+/** Padding on top of Retry-After: the window is measured server-side. */
+const RETRY_AFTER_GRACE_MS = 2_000;
 
 /** 4xx other than 429 will not fix themselves — retrying is just noise. */
 function isRetryable(err: unknown): boolean {
@@ -58,7 +88,9 @@ async function fetchOnce(url: string, delayMs: number): Promise<string> {
     lastRequestAt = Date.now();
   }
 
-  if (!res.ok) throw new HttpError(res.status, url);
+  if (!res.ok) {
+    throw new HttpError(res.status, url, parseRetryAfter(res.headers.get('retry-after')));
+  }
   return await res.text();
 }
 
@@ -87,8 +119,14 @@ export function fetchPage(url: string, opts: FetchOptions = {}): Promise<string>
       } catch (err) {
         lastError = err as Error;
         if (!isRetryable(err) || attempt === config.maxRetries) break;
-        // Exponential backoff on top of the base delay.
-        const waitMs = delayMs * 2 ** attempt;
+        // Exponential backoff on top of the base delay, but never shorter than
+        // what the server asked for — a 429 retried in 2.4s just re-trips it.
+        const backoffMs = delayMs * 2 ** attempt;
+        const askedMs =
+          err instanceof HttpError && err.retryAfterMs !== null
+            ? Math.min(err.retryAfterMs + RETRY_AFTER_GRACE_MS, MAX_RETRY_AFTER_MS)
+            : 0;
+        const waitMs = Math.max(backoffMs, askedMs);
         opts.onRetry?.(attempt, lastError, waitMs);
         await sleep(waitMs);
       }

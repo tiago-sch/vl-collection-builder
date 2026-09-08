@@ -66,7 +66,7 @@ services:
 
       # Politeness. There is deliberately no download concurrency setting — see
       # "Why downloads are serial" in the README.
-      CRAWL_DELAY_MS: "1200"
+      CRAWL_DELAY_MS: "4000"
       INTER_DOWNLOAD_DELAY_MS: "3000"
 
       # Set to match your front-end: slug | esde | batocera | retroarch.

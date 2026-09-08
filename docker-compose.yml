@@ -23,7 +23,7 @@ services:
       LIBRARY_PATH: /library
 
       # --- crawler politeness (plan §11) ---
-      CRAWL_DELAY_MS: "1200"
+      CRAWL_DELAY_MS: "4000"
       USER_AGENT: "vl-collection-builder/0.1 (personal catalogue tool)"
 
       # --- source registry (plan §1.1) ---

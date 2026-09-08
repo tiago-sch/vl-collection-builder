@@ -128,7 +128,24 @@ export async function syncPlatform(
           page,
           registry.listFilters,
         );
-        const html = await fetchPage(url, { delayMs: settings.crawlDelayMs });
+        const html = await fetchPage(url, {
+          delayMs: settings.crawlDelayMs,
+          onRetry: (attempt, error, waitMs) => {
+            // A 429 wait is a minute long; without this the UI looks hung.
+            const seconds = Math.round(waitMs / 1000);
+            console.warn(
+              `sync ${platform.slug} section ${section} page ${page}: ${error.message} — retry ${attempt} in ${seconds}s`,
+            );
+            opts.onProgress?.({
+              platform: platform.slug,
+              section: `${section} (waiting ${seconds}s, retry ${attempt})`,
+              sectionsDone: index,
+              sectionsTotal: SECTIONS.length,
+              entriesSeen,
+              status: 'running',
+            });
+          },
+        });
         pagesFetched += 1;
 
         const result = parseListing(html);

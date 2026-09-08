@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { parseRetryAfter } from '../src/catalog/fetcher.js';
 import { describeError } from '../src/util/errors.js';
 
 /** How Node actually reports a transport failure: a wrapper plus a cause. */
@@ -60,5 +61,26 @@ describe('describeError', () => {
     (a as { cause?: unknown }).cause = b;
     (b as { cause?: unknown }).cause = a;
     expect(describeError(a).length).toBeLessThan(100);
+  });
+});
+
+describe('parseRetryAfter', () => {
+  it('reads delta-seconds, the form Vimm sends', () => {
+    expect(parseRetryAfter('60')).toBe(60_000);
+    expect(parseRetryAfter(' 5 ')).toBe(5_000);
+  });
+
+  it('reads an HTTP-date as milliseconds from now', () => {
+    const inTen = new Date(Date.now() + 10_000).toUTCString();
+    const ms = parseRetryAfter(inTen);
+    expect(ms).not.toBeNull();
+    expect(ms!).toBeGreaterThan(5_000);
+    expect(ms!).toBeLessThanOrEqual(10_000);
+  });
+
+  it('treats a missing or garbage header as absent', () => {
+    expect(parseRetryAfter(null)).toBeNull();
+    expect(parseRetryAfter('soon')).toBeNull();
+    expect(parseRetryAfter('-3')).toBeNull();
   });
 });
