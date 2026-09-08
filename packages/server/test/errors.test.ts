@@ -1,5 +1,8 @@
 import { describe, expect, it } from 'vitest';
-import { parseRetryAfter } from '../src/catalog/fetcher.js';
+import { readFileSync } from 'node:fs';
+import { dirname, resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
+import { isHumanCheckPage, parseRetryAfter } from '../src/catalog/fetcher.js';
 import { describeError } from '../src/util/errors.js';
 
 /** How Node actually reports a transport failure: a wrapper plus a cause. */
@@ -82,5 +85,19 @@ describe('parseRetryAfter', () => {
     expect(parseRetryAfter(null)).toBeNull();
     expect(parseRetryAfter('soon')).toBeNull();
     expect(parseRetryAfter('-3')).toBeNull();
+  });
+});
+
+describe('isHumanCheckPage', () => {
+  const fixtures = resolve(dirname(fileURLToPath(import.meta.url)), 'fixtures');
+  const load = (name: string): string => readFileSync(resolve(fixtures, name), 'utf8');
+
+  it('recognises the Turnstile challenge Vimm serves (with a 404 status) for a game page', () => {
+    expect(isHumanCheckPage(load('vault-96940-human-check.html'))).toBe(true);
+  });
+
+  it('does not mistake a real vault page or a listing for the challenge', () => {
+    expect(isHumanCheckPage(load('vault-1001-snes.html'))).toBe(false);
+    expect(isHumanCheckPage(load('3ds-list-M.html'))).toBe(false);
   });
 });

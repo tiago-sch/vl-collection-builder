@@ -29,7 +29,8 @@ import { pipeline } from 'node:stream/promises';
 import { Readable } from 'node:stream';
 import type { DownloadItem, DownloadProgress } from '@vl-collection-builder/shared';
 import { config } from '../config.js';
-import { fetchPage } from '../catalog/fetcher.js';
+import { HumanCheckError, fetchPage } from '../catalog/fetcher.js';
+import { getSettings } from '../db/settings.js';
 import { freeDiskMb } from '../util/disk.js';
 import { describeError, errorContext } from '../util/errors.js';
 import {
@@ -116,7 +117,15 @@ export class DownloadError extends Error {
  * before any bytes move and makes the disk precheck exact.
  */
 async function prepare(item: DownloadItem): Promise<{ url: string; referer: string }> {
-  const html = await fetchPage(item.vaultUrl);
+  let html: string;
+  try {
+    html = await fetchPage(item.vaultUrl);
+  } catch (err) {
+    // Retrying a human check burns attempts and produces the same page; fail
+    // the item with the instructions instead.
+    if (err instanceof HumanCheckError) throw new DownloadError(err.message, false);
+    throw err;
+  }
   const page = parseVaultPage(html);
 
   for (const w of page.warnings) {
@@ -161,7 +170,12 @@ export async function transfer(item: DownloadItem, url: string, referer: string)
   // Never Range from 0 — the server returns the tail of the file for ranges
   // starting at zero, which would silently corrupt the download. See vimm.ts.
   const res = await fetch(url, {
-    headers: downloadHeaders({ referer, userAgent: downloadUserAgent(), offset }),
+    headers: downloadHeaders({
+      referer,
+      userAgent: downloadUserAgent(),
+      offset,
+      cookie: getSettings().sourceCookie,
+    }),
     redirect: 'follow',
     signal: config.downloadTimeoutMs > 0 ? AbortSignal.timeout(config.downloadTimeoutMs) : undefined,
   });

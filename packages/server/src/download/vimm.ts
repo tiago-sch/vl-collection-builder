@@ -206,6 +206,8 @@ export function downloadHeaders(opts: {
   referer: string;
   userAgent: string;
   offset: number;
+  /** The user's verified session cookie, sent when set. */
+  cookie?: string;
 }): Record<string, string> {
   const headers: Record<string, string> = {
     'user-agent': opts.userAgent,
@@ -213,6 +215,7 @@ export function downloadHeaders(opts: {
     accept: 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
     'accept-language': 'en-US,en;q=0.9',
   };
+  if (opts.cookie) headers.cookie = opts.cookie;
   if (opts.offset > 0) headers.range = `bytes=${opts.offset}-`;
   return headers;
 }

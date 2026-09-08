@@ -35,6 +35,13 @@ export async function settingsRoutes(app: FastifyInstance): Promise<void> {
       }
     }
 
+    if (body.sourceCookie !== undefined) {
+      // A header value: one line, no control characters.
+      if (typeof body.sourceCookie !== 'string' || /[\r\n\0]/.test(body.sourceCookie)) {
+        return reply.code(400).send({ error: 'sourceCookie must be a single-line string' });
+      }
+    }
+
     return { settings: updateSettings(body) };
   });
 }

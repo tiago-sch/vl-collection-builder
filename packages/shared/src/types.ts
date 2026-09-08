@@ -235,6 +235,13 @@ export interface AppSettings {
   maxCandidates: number;
   crawlDelayMs: number;
   staleAfterDays: number;
+  /**
+   * Cookie header sent to the source site on game-page and download requests.
+   * Vimm puts a Cloudflare human check in front of every game page; passing it
+   * once in a browser marks that browser's PHPSESSID as verified, and pasting
+   * it here lets the downloader reuse the session you verified.
+   */
+  sourceCookie: string;
   setupCompletedAt: string | null;
 }
 

@@ -58,6 +58,7 @@ export function getSettings(): AppSettings {
     maxCandidates: num('max_candidates', Number(settingDefaults.max_candidates)),
     crawlDelayMs: num('crawl_delay_ms', Number(settingDefaults.crawl_delay_ms)),
     staleAfterDays: num('stale_after_days', Number(settingDefaults.stale_after_days)),
+    sourceCookie: getRaw('source_cookie') ?? '',
     setupCompletedAt: getRaw('setup_completed_at'),
   };
 }
@@ -81,6 +82,7 @@ export interface SettingsPatch {
   maxCandidates?: number;
   crawlDelayMs?: number;
   staleAfterDays?: number;
+  sourceCookie?: string;
 }
 
 export function updateSettings(patch: SettingsPatch): AppSettings {
@@ -94,6 +96,7 @@ export function updateSettings(patch: SettingsPatch): AppSettings {
   if (patch.maxCandidates !== undefined) setRaw('max_candidates', String(patch.maxCandidates));
   if (patch.crawlDelayMs !== undefined) setRaw('crawl_delay_ms', String(patch.crawlDelayMs));
   if (patch.staleAfterDays !== undefined) setRaw('stale_after_days', String(patch.staleAfterDays));
+  if (patch.sourceCookie !== undefined) setRaw('source_cookie', patch.sourceCookie.trim());
   return getSettings();
 }
 

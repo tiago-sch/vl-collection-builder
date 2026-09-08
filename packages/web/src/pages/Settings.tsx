@@ -166,6 +166,35 @@ export function Settings() {
         </button>
       </div>
 
+      <div className="card">
+        <h2>Source session</h2>
+        <p className="muted" style={{ marginTop: 0, fontSize: 13 }}>
+          The source site puts a &ldquo;are you human&rdquo; check in front of every game page,
+          so downloads fail until a person has passed it. Pass it once in your own browser, then
+          paste that browser&rsquo;s cookie here and the downloader reuses the session you verified.
+          Open any game page on the site, pass the check, then copy the <code>PHPSESSID</code>{' '}
+          cookie from your browser&rsquo;s developer tools (Application → Cookies).
+        </p>
+        <label className="field">
+          <span>Cookie</span>
+          <input
+            type="text"
+            value={settings.sourceCookie}
+            placeholder="PHPSESSID=…"
+            onChange={(e) => setSettings({ ...settings, sourceCookie: e.target.value })}
+            spellCheck={false}
+            autoComplete="off"
+          />
+          <span style={{ textTransform: 'none', letterSpacing: 0, marginTop: 5, fontSize: 12 }}>
+            Sent as the Cookie header on game-page and download requests only. Sessions expire;
+            when downloads start failing with a human-check message, repeat the steps above.
+          </span>
+        </label>
+        <button className="primary" onClick={() => void save({ sourceCookie: settings.sourceCookie })}>
+          Save session
+        </button>
+      </div>
+
       <div className="panel">
         <h2>Catalogues</h2>
         {health && health.circuitOpen && (

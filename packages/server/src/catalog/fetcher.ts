@@ -9,6 +9,7 @@
  * calls that out as the one thing not to copy.
  */
 import { config } from '../config.js';
+import { getSettings } from '../db/settings.js';
 import { assertClosed, recordFailure, recordSuccess } from './health.js';
 import { describeError } from '../util/errors.js';
 
@@ -33,6 +34,28 @@ export class HttpError extends Error {
     super(`HTTP ${status} for ${url}`);
     this.name = 'HttpError';
   }
+}
+
+/**
+ * Vimm fronts every game page with a Cloudflare Turnstile "are you human"
+ * check (September 2026) and serves the challenge with a 404 status. There is
+ * no media JSON on that page, so a download cannot proceed. The check is tied
+ * to the PHPSESSID cookie: pass it once in a browser and paste the cookie into
+ * Settings, and the same session is accepted here.
+ */
+export class HumanCheckError extends Error {
+  constructor(public readonly url: string) {
+    super(
+      'the source site is asking for a human check on this page — open it in your browser, ' +
+        'pass the check, then paste your PHPSESSID cookie into Settings → Source session',
+    );
+    this.name = 'HumanCheckError';
+  }
+}
+
+/** The challenge page is recognisable by its Turnstile widget. */
+export function isHumanCheckPage(html: string): boolean {
+  return /class=["']cf-turnstile["']|challenges\.cloudflare\.com\/turnstile/i.test(html);
 }
 
 /**
@@ -66,7 +89,14 @@ const RETRY_AFTER_GRACE_MS = 2_000;
 /** 4xx other than 429 will not fix themselves — retrying is just noise. */
 function isRetryable(err: unknown): boolean {
   if (err instanceof HttpError) return err.status === 429 || err.status >= 500;
+  if (err instanceof HumanCheckError) return false;
   return true; // network error, timeout, aborted read
+}
+
+/** The user's verified session, if they pasted one. Empty means no header. */
+export function sourceCookieHeader(): Record<string, string> {
+  const cookie = getSettings().sourceCookie;
+  return cookie ? { cookie } : {};
 }
 
 async function fetchOnce(url: string, delayMs: number): Promise<string> {
@@ -80,6 +110,7 @@ async function fetchOnce(url: string, delayMs: number): Promise<string> {
         'user-agent': config.userAgent,
         accept: 'text/html,application/xhtml+xml',
         'accept-language': 'en',
+        ...sourceCookieHeader(),
       },
       redirect: 'follow',
       signal: AbortSignal.timeout(config.requestTimeoutMs),
@@ -88,10 +119,14 @@ async function fetchOnce(url: string, delayMs: number): Promise<string> {
     lastRequestAt = Date.now();
   }
 
+  // Read the body before judging the status: the human-check page comes back
+  // as a 404, and a bare "404" would send someone hunting for a dead link.
+  const body = await res.text();
+  if (isHumanCheckPage(body)) throw new HumanCheckError(url);
   if (!res.ok) {
     throw new HttpError(res.status, url, parseRetryAfter(res.headers.get('retry-after')));
   }
-  return await res.text();
+  return body;
 }
 
 export interface FetchOptions {
@@ -136,6 +171,9 @@ export function fetchPage(url: string, opts: FetchOptions = {}): Promise<string>
     // section with no titles (3DS has no "Q"). It must not count toward the
     // circuit breaker, or a small platform trips it on empty letters alone.
     if (lastError instanceof HttpError && lastError.status === 404) throw lastError;
+    // Likewise a human check: the site is up, it just wants a person. Counting
+    // it would open the circuit and hide the actionable message.
+    if (lastError instanceof HumanCheckError) throw lastError;
 
     const described = lastError ? describeError(lastError) : 'unknown error';
     const health = recordFailure(SOURCE, described);

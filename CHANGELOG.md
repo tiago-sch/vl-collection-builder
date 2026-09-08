@@ -35,6 +35,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Every download failed with `HTTP 404` on the game page. Vimm now fronts game
+  pages with a Cloudflare human check and serves the challenge as a 404. The
+  failure now names the human check and says what to do, and a new
+  **Settings → Source session** field takes the `PHPSESSID` cookie from a
+  browser that has passed the check, so the downloader reuses that verified
+  session on game-page and download requests.
+
 - Syncing a platform with an empty letter section (3DS has no "Q" titles)
   failed with `HTTP 404`. Vimm answers 404 for such a section instead of an
   empty page; it is now treated as empty and no longer counts toward the
