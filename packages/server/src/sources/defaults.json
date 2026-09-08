@@ -29,6 +29,7 @@
     { "slug": "gbc", "system": "GBC", "label": "Game Boy Color", "discBased": false },
     { "slug": "gba", "system": "GBA", "label": "Game Boy Advance", "discBased": false },
     { "slug": "nds", "system": "DS", "label": "Nintendo DS", "discBased": false },
+    { "slug": "n3ds", "system": "3DS", "label": "Nintendo 3DS", "discBased": false },
     { "slug": "genesis", "system": "Genesis", "label": "Sega Genesis / Mega Drive", "discBased": false },
     { "slug": "saturn", "system": "Saturn", "label": "Sega Saturn", "discBased": true },
     { "slug": "dc", "system": "Dreamcast", "label": "Sega Dreamcast", "discBased": true },
@@ -42,7 +43,7 @@
   "folderStyles": {
     "slug": {},
     "esde": { "ngc": "gc", "dc": "dreamcast" },
-    "batocera": { "ngc": "gamecube", "dc": "dreamcast", "genesis": "megadrive" },
+    "batocera": { "ngc": "gamecube", "dc": "dreamcast", "genesis": "megadrive", "n3ds": "3ds" },
     "retroarch": {}
   }
 }

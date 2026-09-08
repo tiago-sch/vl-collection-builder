@@ -37,7 +37,7 @@ const LEADING_ARTICLES = /^(the|a|an)\s+/;
  * system in parentheses — 'Okami (PS2)' (plan §1.1).
  */
 const TRAILING_MARKERS =
-  /[([{](?:usa|europe|japan|australia|korea|asia|canada|brazil|china|france|germany|italy|netherlands|spain|sweden|russia|world|united kingdom|latin america|[a-z]{2,3}(?:,\s*[a-z]{2,3})*|nes|snes|n64|gamecube|gc|wii|gb|gbc|gba|ds|genesis|megadrive|saturn|dreamcast|dc|ps1|psx|ps2|ps3|psp|xbox|xbox360|disc\s*\d+|disk\s*\d+|cd\s*\d+|rev\s*[a-z0-9.]+|v[\d.]+|beta|proto|prototype|demo|sample|unl|pirate|greatest hits|platinum|player'?s choice|best seller|classics|the best|en|ja|fr|de|es|it|pt|nl|sv|ko|zh|ru)[)\]}]/g;
+  /[([{](?:usa|europe|japan|australia|korea|asia|canada|brazil|china|france|germany|italy|netherlands|spain|sweden|russia|world|united kingdom|latin america|[a-z]{2,3}(?:,\s*[a-z]{2,3})*|nes|snes|n64|gamecube|gc|wii|gb|gbc|gba|ds|nds|3ds|genesis|megadrive|saturn|dreamcast|dc|ps1|psx|ps2|ps3|psp|xbox|xbox360|disc\s*\d+|disk\s*\d+|cd\s*\d+|rev\s*[a-z0-9.]+|v[\d.]+|beta|proto|prototype|demo|sample|unl|pirate|greatest hits|platinum|player'?s choice|best seller|classics|the best|en|ja|fr|de|es|it|pt|nl|sv|ko|zh|ru)[)\]}]/g;
 
 /**
  * Titles stored the library way: 'Legend of Zelda, The' rather than

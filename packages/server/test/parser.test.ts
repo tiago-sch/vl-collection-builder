@@ -16,6 +16,7 @@ const ps2ListS = load('ps2-list-S.html');
 const ps2ListSPage2 = load('ps2-list-S-p2.html');
 const ps2Search = load('ps2-search-silenthill.html');
 const snesList = load('snes-list-hash.html');
+const n3dsListM = load('3ds-list-M.html');
 
 describe('parseTable — PS2 letter listing', () => {
   const result = parseTable(ps2ListS);
@@ -210,5 +211,32 @@ describe('parseListing — strategy selection', () => {
     const result = parseListing('<html><body><p>Nothing here</p></body></html>');
     expect(result.entries).toEqual([]);
     expect(result.hasNextPage).toBe(false);
+  });
+});
+
+describe('parseTable — 3DS listing (September 2026 markup)', () => {
+  // Captured after Vimm rewrote the honeypot as `display:  none` (two spaces).
+  // Before the regex-based strip, parseTable returned 0 rows for EVERY
+  // platform and parseListing quietly fell back to the columnless anchor scan.
+  it('still uses the table strategy and keeps every column', () => {
+    const result = parseListing(n3dsListM);
+    expect(result.strategy).toBe('table');
+    expect(result.columnsMissing).toBe(false);
+    expect(result.entries.length).toBeGreaterThanOrEqual(41);
+    const kart = result.entries.find((e) => e.title === 'Mario Kart 7');
+    expect(kart?.regions).toEqual(['USA']);
+    expect(kart?.version).toBe('1.0');
+  });
+
+  it('strips the double-spaced honeypot', () => {
+    const result = parseTable(n3dsListM);
+    expect(result.decoysSkipped).toBeGreaterThanOrEqual(41);
+    expect(result.entries.some((e) => e.vaultId === DECOY_VAULT_ID)).toBe(false);
+  });
+
+  it('accepts the versioned /vault/<id>?v=1.0 hrefs and dedupes per game', () => {
+    const ids = parseTable(n3dsListM).entries.map((e) => e.vaultId);
+    expect(ids).toContain(97863); // Mario & Luigi: Dream Team, listed as v1.0 and v1.1
+    expect(ids.filter((id) => id === 97863)).toHaveLength(1);
   });
 });

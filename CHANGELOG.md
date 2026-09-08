@@ -31,6 +31,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `npm run eval` — replays confirmed matches through the matcher to measure
   match quality against real ground truth.
 - Docker image with `chdman` included; three independently mountable volumes.
+- **Nintendo 3DS** platform (slug `n3ds`, Batocera folder `3ds`).
+
+### Fixed
+
+- Listing pages parsed with no region, version or rating after Vimm rewrote the
+  honeypot style as `display:  none` (two spaces); the table strategy now
+  matches the style with a regex, and versioned `/vault/<id>?v=1.0` rows are
+  accepted.
 
 ### Notes on the source site
 

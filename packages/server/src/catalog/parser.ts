@@ -36,14 +36,26 @@ export const DECOY_VAULT_ID = 999999;
 /** Rows per listing page, observed. Used only as a sanity signal, not for paging. */
 export const ROWS_PER_PAGE = 200;
 
-/** Matches a game page href: /vault/8433. Excludes /vault/?p=rating&id=… */
-const VAULT_HREF = /^\/vault\/(\d+)\/?$/;
+/**
+ * Matches a game page href: /vault/8433, or /vault/97863?v=1.0 when a title
+ * ships several revisions (3DS lists each one as its own row). Excludes
+ * /vault/?p=rating&id=… because that has no id segment.
+ */
+const VAULT_HREF = /^\/vault\/(\d+)\/?(?:\?[^"']*)?$/;
 
 /** Same thing for the raw-HTML fallback, tolerating the `href= "…"` spacing. */
-const VAULT_HREF_RAW = /href=\s*["']\/vault\/(\d+)\/?["']/gi;
+const VAULT_HREF_RAW = /href=\s*["']\/vault\/(\d+)\/?(?:\?[^"']*)?["']/gi;
+
+/**
+ * The inline style that hides a honeypot. Vimm has written it both as
+ * `display:none` and `display:  none` (two spaces, September 2026), and an
+ * attribute-substring selector matches only the exact spelling — which turned
+ * the table strategy off for every platform overnight. Match on a regex instead.
+ */
+const HIDDEN_STYLE = /display\s*:\s*none/i;
 
 /** Anchors the site hides from users. Stripped before any id extraction. */
-const HIDDEN_ANCHOR_RAW = /<a\b[^>]*style=["'][^"']*display:\s*none[^"']*["'][^>]*>[\s\S]*?<\/a>/gi;
+const HIDDEN_ANCHOR_RAW = /<a\b[^>]*style=["'][^"']*display\s*:\s*none[^"']*["'][^>]*>[\s\S]*?<\/a>/gi;
 
 function decodeEntities(s: string): string {
   return s
@@ -108,7 +120,8 @@ export function parseTable(html: string): ParseResult {
   let decoysSkipped = 0;
 
   // Drop the honeypots from the DOM up front so nothing downstream can see them.
-  $('a[style*="display:none"], a[style*="display: none"]').each((_, el) => {
+  $('a[style]').each((_, el) => {
+    if (!HIDDEN_STYLE.test($(el).attr('style') ?? '')) return;
     const href = $(el).attr('href') ?? '';
     if (VAULT_HREF.test(href)) decoysSkipped += 1;
     $(el).remove();
@@ -119,17 +132,24 @@ export function parseTable(html: string): ParseResult {
   $('tr').each((_, tr) => {
     const row = $(tr);
 
+    // Belt and braces: should a honeypot ever survive the strip above, skip
+    // past it to the real anchor rather than discarding the whole row.
     const link = row
       .find('a[href]')
-      .filter((_i, a) => VAULT_HREF.test($(a).attr('href') ?? ''))
+      .filter((_i, a) => {
+        const m = VAULT_HREF.exec($(a).attr('href') ?? '');
+        if (!m) return false;
+        if (Number(m[1]) === DECOY_VAULT_ID) {
+          decoysSkipped += 1;
+          return false;
+        }
+        return true;
+      })
       .first();
     if (link.length === 0) return;
 
     const vaultId = Number.parseInt(VAULT_HREF.exec(link.attr('href') ?? '')?.[1] ?? '', 10);
-    if (!Number.isFinite(vaultId) || vaultId === DECOY_VAULT_ID) {
-      decoysSkipped += 1;
-      return;
-    }
+    if (!Number.isFinite(vaultId)) return;
     // A game can legitimately appear once per page only; a repeat means we are
     // looking at a nested or duplicated table.
     if (seen.has(vaultId)) return;
