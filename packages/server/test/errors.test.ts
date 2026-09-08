@@ -3,6 +3,7 @@ import { readFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { isHumanCheckPage, parseRetryAfter } from '../src/catalog/fetcher.js';
+import { normaliseCookie } from '../src/db/settings.js';
 import { describeError } from '../src/util/errors.js';
 
 /** How Node actually reports a transport failure: a wrapper plus a cause. */
@@ -99,5 +100,24 @@ describe('isHumanCheckPage', () => {
   it('does not mistake a real vault page or a listing for the challenge', () => {
     expect(isHumanCheckPage(load('vault-1001-snes.html'))).toBe(false);
     expect(isHumanCheckPage(load('3ds-list-M.html'))).toBe(false);
+  });
+});
+
+describe('normaliseCookie', () => {
+  // Copying a session id out of a browser's cookie inspector gives the value
+  // alone; sent as a Cookie header it is silently ignored by the site.
+  it('turns a bare session id into a usable Cookie header value', () => {
+    expect(normaliseCookie('ui15g48e2eimndhji5k27dkfou')).toBe('PHPSESSID=ui15g48e2eimndhji5k27dkfou');
+    expect(normaliseCookie('  ui15g48e2eimndhji5k27dkfou  ')).toBe('PHPSESSID=ui15g48e2eimndhji5k27dkfou');
+  });
+
+  it('leaves a full cookie string alone', () => {
+    expect(normaliseCookie('PHPSESSID=abc')).toBe('PHPSESSID=abc');
+    expect(normaliseCookie('PHPSESSID=abc; counted=1')).toBe('PHPSESSID=abc; counted=1');
+  });
+
+  it('keeps empty empty, so clearing the field clears the header', () => {
+    expect(normaliseCookie('')).toBe('');
+    expect(normaliseCookie('   ')).toBe('');
   });
 });

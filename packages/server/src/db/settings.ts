@@ -85,6 +85,17 @@ export interface SettingsPatch {
   sourceCookie?: string;
 }
 
+/**
+ * A Cookie header needs `name=value`, but the natural thing to copy out of a
+ * browser's cookie inspector is the value alone. A bare session id is silently
+ * ignored by the site and looks identical to a wrong cookie, so name it here.
+ */
+export function normaliseCookie(raw: string): string {
+  const value = raw.trim();
+  if (!value || value.includes('=')) return value;
+  return `PHPSESSID=${value}`;
+}
+
 export function updateSettings(patch: SettingsPatch): AppSettings {
   if (patch.regionPreference !== undefined) {
     setRaw('region_preference', JSON.stringify(patch.regionPreference));
@@ -96,7 +107,7 @@ export function updateSettings(patch: SettingsPatch): AppSettings {
   if (patch.maxCandidates !== undefined) setRaw('max_candidates', String(patch.maxCandidates));
   if (patch.crawlDelayMs !== undefined) setRaw('crawl_delay_ms', String(patch.crawlDelayMs));
   if (patch.staleAfterDays !== undefined) setRaw('stale_after_days', String(patch.staleAfterDays));
-  if (patch.sourceCookie !== undefined) setRaw('source_cookie', patch.sourceCookie.trim());
+  if (patch.sourceCookie !== undefined) setRaw('source_cookie', normaliseCookie(patch.sourceCookie));
   return getSettings();
 }
 

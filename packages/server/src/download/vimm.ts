@@ -49,6 +49,7 @@
  * always verify the finished file against the published checksum.
  */
 import * as cheerio from 'cheerio';
+import type { AnyNode } from 'domhandler';
 
 /** One downloadable item — a game, or one disc of a multi-disc release. */
 export interface MediaEntry {
@@ -109,13 +110,49 @@ function str(value: unknown): string | null {
 }
 
 /** Parse a vault game page into everything needed to download it. */
+/** Matches the banner the page shows when a file really is gone. */
+const UNAVAILABLE_TEXT = /download\s+unavailable/i;
+
+/** Is this element, or anything above it, hidden from the reader? */
+function isHidden($: cheerio.CheerioAPI, el: AnyNode): boolean {
+  let node = $(el);
+  while (node.length > 0 && node.prop('tagName')) {
+    if (node.attr('hidden') !== undefined) return true;
+    if (/display\s*:\s*none/i.test(node.attr('style') ?? '')) return true;
+    node = node.parent();
+  }
+  return false;
+}
+
+/**
+ * Does the page actually say this download is unavailable?
+ *
+ * Every vault page ships the banner as a hidden row (`<tr id="upload-row"
+ * style="display:none">`) and reveals it only when the file is really gone, so
+ * a plain text search reports every page as unavailable. This previously hid
+ * behind an unrelated `downloadHost === null` guard: when the download form's
+ * id changed and the host stopped being found, every download suddenly claimed
+ * to be unavailable. So ask the question directly — is the banner visible?
+ */
+export function saysUnavailable($: cheerio.CheerioAPI): boolean {
+  const matches = $('*').filter((_i, el) => {
+    const $el = $(el);
+    if (!UNAVAILABLE_TEXT.test($el.text())) return false;
+    // Keep only the innermost holder; every ancestor contains the text too.
+    return $el.children().filter((_j, c) => UNAVAILABLE_TEXT.test($(c).text())).length === 0;
+  });
+  return matches.toArray().some((el) => !isHidden($, el));
+}
+
 export function parseVaultPage(html: string): VaultPage {
   const warnings: string[] = [];
   const $ = cheerio.load(html);
 
   // --- download host, from the form action ---------------------------------
   let downloadHost: string | null = null;
-  const action = $('form#dl_form').attr('action') ?? '';
+  // The form id changed from `dl_form` to `dl-form` (September 2026); accept
+  // either so an older mirror or a cached page still parses.
+  const action = $('form#dl_form, form#dl-form').attr('action') ?? '';
   if (action) {
     // Protocol-relative: //dl3.vimm.net/
     const normalized = action.startsWith('//') ? `https:${action}` : action;
@@ -126,11 +163,13 @@ export function parseVaultPage(html: string): VaultPage {
     }
   }
 
-  const unavailable = /download\s+unavailable/i.test($('body').text()) && downloadHost === null;
+  const unavailable = saysUnavailable($);
 
   // --- media array, from the inline script ---------------------------------
   const media: MediaEntry[] = [];
-  const scriptMatch = /let\s+media\s*=\s*(\[[\s\S]*?\])\s*;/.exec(html);
+  // The variable was renamed `media` -> `allMedia` (September 2026). Match
+  // either name rather than pinning to whichever one shipped last.
+  const scriptMatch = /let\s+(?:all)?[Mm]edia\s*=\s*(\[[\s\S]*?\])\s*;/.exec(html);
 
   if (scriptMatch?.[1]) {
     try {
@@ -167,7 +206,9 @@ export function parseVaultPage(html: string): VaultPage {
   // Fall back to the form's hidden mediaId. Loses the filename, size and
   // checksums, so the download still works but is verified only by byte count.
   if (media.length === 0) {
-    const formMediaId = num($('form#dl_form input[name="mediaId"]').attr('value'));
+    const formMediaId = num(
+    $('form#dl_form input[name="mediaId"], form#dl-form input[name="mediaId"]').attr('value'),
+  );
     if (formMediaId !== null) {
       media.push({
         mediaId: formMediaId,

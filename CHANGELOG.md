@@ -35,6 +35,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Downloads failed after the human check was satisfied, first with a bare
+  parse failure and then with a misleading *"the vault page says this download
+  is unavailable"*. Vimm renamed the media variable (`media` → `allMedia`) and
+  the download form id (`dl_form` → `dl-form`), so the host and filename were
+  no longer found. Both names are now accepted.
+- *"Download unavailable"* was reported for every game. That banner ships on
+  every page as a hidden row and is revealed only when a file is really gone;
+  the old check read the text and leaned on an unrelated null-host guard, so
+  the markup change above turned it on everywhere. It now asks whether the
+  banner is actually visible, and a parse failure no longer masquerades as a
+  missing file.
+- The **Source session** field accepts a bare session id, not just a full
+  `PHPSESSID=…` cookie string. Pasting the value alone is the natural thing to
+  do and was silently ignored by the site.
+
 - Every download failed with `HTTP 404` on the game page. Vimm now fronts game
   pages with a Cloudflare human check and serves the challenge as a 404. The
   failure now names the human check and says what to do, and a new

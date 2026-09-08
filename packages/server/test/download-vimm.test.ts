@@ -153,3 +153,55 @@ describe('filenames', () => {
     expect(fileNameFromDisposition('attachment')).toBeNull();
   });
 });
+
+describe('the September 2026 vault-page markup change', () => {
+  const fixtures = resolve(dirname(fileURLToPath(import.meta.url)), 'fixtures');
+  const verified = readFileSync(resolve(fixtures, 'vault-96940-verified.html'), 'utf8');
+
+  // Vimm renamed the media variable `media` -> `allMedia` and the form id
+  // `dl_form` -> `dl-form`. Pinned to the old names, the parser found no media
+  // and downloads failed after the human check was already satisfied.
+  it('reads media from the renamed allMedia variable', () => {
+    const page = parseVaultPage(verified);
+    expect(page.media).toHaveLength(1);
+    expect(page.media[0]!.fileName).toBe('Ace Combat - Assault Horizon Legacy (USA) (En,Fr,Es).3ds');
+    expect(page.media[0]!.mediaId).toBe(93794);
+    expect(page.media[0]!.expectedBytes).toBe(438089728);
+  });
+
+  it('reads the download host from the renamed dl-form', () => {
+    expect(parseVaultPage(verified).downloadHost).toBe('https://dl3.vimm.net');
+  });
+
+  it('still parses the older markup, so a cached or mirrored page works', () => {
+    const old = readFileSync(resolve(fixtures, 'vault-1001-snes.html'), 'utf8');
+    const page = parseVaultPage(old);
+    expect(page.downloadHost).toBeTruthy();
+    expect(page.media.length).toBeGreaterThan(0);
+  });
+});
+
+describe('"download unavailable" detection', () => {
+  const fixtures = resolve(dirname(fileURLToPath(import.meta.url)), 'fixtures');
+  const verified = readFileSync(resolve(fixtures, 'vault-96940-verified.html'), 'utf8');
+
+  it('does not flag a normal page, whose banner is present but hidden', () => {
+    // Guards the premise: the text really is on every page.
+    expect(verified).toMatch(/Download unavailable/i);
+    expect(parseVaultPage(verified).unavailable).toBe(false);
+  });
+
+  it('flags the page when the site actually reveals the banner', () => {
+    const shown = verified.replace('id="upload-row" style="display:none"', 'id="upload-row"');
+    expect(parseVaultPage(shown).unavailable).toBe(true);
+  });
+
+  it('does not blame the file when the download form cannot be found', () => {
+    // The old check keyed off a null downloadHost, so a markup change to the
+    // form told the user their ROM was gone instead of that parsing broke.
+    const noForm = verified.replace('id="dl-form"', 'id="dl-renamed-again"');
+    const page = parseVaultPage(noForm);
+    expect(page.downloadHost).toBeNull();
+    expect(page.unavailable).toBe(false);
+  });
+});
